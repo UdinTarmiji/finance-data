@@ -1,25 +1,47 @@
+# 📊 Finance Tracker App with GitHub Sync
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import datetime as dt
 import random
 import os
+from github import Github
 
+# --- Konfigurasi Streamlit ---
 st.set_page_config(page_title="📊 Finance Tracker", page_icon="💰")
-st.title("💰 Aplikasi Analisis Keuangan Harian")
+st.title("💰 Aplikasi Analisis Keuangan Harian dengan Penyimpanan GitHub")
 
-# --- Buat folder data user ---
-user_id = st.experimental_user.get("id", default=str(dt.datetime.now().timestamp()))
-user_data_folder = f"data/user_{user_id}"
-os.makedirs(user_data_folder, exist_ok=True)
-data_path = os.path.join(user_data_folder, "finance_data.csv")
+# --- Konfigurasi GitHub ---
+GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
+GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")  # contoh: "UdinTarmiji/finance-data"
+
+# --- Fungsi Simpan ke GitHub ---
+def simpan_ke_github(username, df):
+    if not GITHUB_TOKEN or not GITHUB_REPO:
+        st.warning("Token GitHub atau repo belum dikonfigurasi.")
+        return
+
+    g = Github(GITHUB_TOKEN)
+    repo = g.get_repo(GITHUB_REPO)
+    folder = f"data/{username}"
+    filename = f"{folder}/finance_data.csv"
+    csv_content = df.to_csv(index=False)
+
+    try:
+        contents = repo.get_contents(filename)
+        repo.update_file(contents.path, f"Update {username} data", csv_content, contents.sha)
+    except:
+        repo.create_file(filename, f"Create {username} data", csv_content)
+
+# --- Input Username ---
+username = st.text_input("👤 Masukkan Username Anda", value="guest")
+if username == "":
+    st.stop()
 
 # --- Inisialisasi Manual Data ---
-if "manual_data" not in st.session_state:
-    if os.path.exists(data_path):
-        st.session_state.manual_data = pd.read_csv(data_path, parse_dates=["tanggal"])
-    else:
-        st.session_state.manual_data = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
+if f"data_{username}" not in st.session_state:
+    st.session_state[f"data_{username}"] = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
 
 # --- Tombol Input Manual ---
 if st.button("➕ Input Data Keuangan Manual"):
@@ -34,18 +56,18 @@ if st.button("➕ Input Data Keuangan Manual"):
             simpan = st.form_submit_button("✅ Simpan")
             if simpan:
                 waktu_komplit = dt.datetime.combine(tanggal, waktu)
-                new_entry = pd.DataFrame({
+                df_baru = pd.DataFrame({
                     "tanggal": [waktu_komplit],
                     "pemasukan": [pemasukan],
                     "pengeluaran": [pengeluaran],
                     "kategori": [kategori if pengeluaran > 0 else "-"]
                 })
-                st.session_state.manual_data = pd.concat([
-                    st.session_state.manual_data,
-                    new_entry
+                st.session_state[f"data_{username}"] = pd.concat([
+                    st.session_state[f"data_{username}"],
+                    df_baru
                 ], ignore_index=True)
-                st.session_state.manual_data.to_csv(data_path, index=False)
-                st.success("✅ Data berhasil ditambahkan!")
+                simpan_ke_github(username, st.session_state[f"data_{username}"])
+                st.success("✅ Data berhasil ditambahkan dan disimpan ke GitHub!")
 
 # --- Upload CSV ---
 st.sidebar.header("📤 Upload CSV")
@@ -54,8 +76,8 @@ uploaded_file = st.sidebar.file_uploader("Unggah file CSV Anda", type=["csv"])
 # --- Load Data ---
 if uploaded_file:
     df = pd.read_csv(uploaded_file, parse_dates=["tanggal"])
-elif not st.session_state.manual_data.empty:
-    df = st.session_state.manual_data.copy()
+elif not st.session_state[f"data_{username}"].empty:
+    df = st.session_state[f"data_{username}"].copy()
 else:
     st.warning("📎 Silakan upload file CSV atau input data manual terlebih dahulu.")
     st.stop()
@@ -78,7 +100,6 @@ st.metric("📤 Total Pengeluaran", f"Rp {total_pengeluaran:,.0f}")
 # --- Pilihan Waktu ---
 waktu = st.selectbox("Tampilkan berdasarkan:", ["Harian", "Mingguan", "Bulanan", "Tahunan"])
 
-# --- Grup Data ---
 if waktu == "Harian":
     df_grouped = df.groupby(df["tanggal"].dt.date).sum(numeric_only=True)
 elif waktu == "Mingguan":
@@ -101,7 +122,7 @@ ax.grid(True, linestyle='--', alpha=0.3)
 ax.legend()
 st.pyplot(fig)
 
-# --- Visualisasi Kategori Pie ---
+# --- Visualisasi Pie Kategori ---
 if "kategori" in df.columns and not df[df["pengeluaran"] > 0].empty:
     st.subheader("📊 Distribusi Pengeluaran berdasarkan Kategori")
     kategori_data = df[df["pengeluaran"] > 0].groupby("kategori")["pengeluaran"].sum()
