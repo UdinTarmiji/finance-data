@@ -10,7 +10,7 @@ st.title("📈 Prediksi Pemasukan Berdasarkan Pengeluaran")
 st.write("Aplikasi ini memprediksi pemasukan harian berdasarkan pengeluaran menggunakan model Machine Learning sederhana.")
 
 # --- Load Dataset dari GitHub ---
-url = "https://raw.githubusercontent.com/UdinTarmiji/finance-data/main/data/finance.csv"
+url = "https://raw.githubusercontent.com/UdinTarmiji/finance-data/main/data/finance_data.csv"
 data = pd.read_csv(url)
 
 # --- Model Training ---
