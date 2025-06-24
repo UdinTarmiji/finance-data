@@ -1,4 +1,4 @@
-# main.py (Versi Lengkap - Stabil, Aman, dan Fitur Tambahan)
+# main.py (Final Version - Auto-create Clean CSV for New Users)
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,9 +8,8 @@ import os
 import base64
 import json
 import requests
-from io import BytesIO
 
-st.set_page_config(page_title="Finance Tracker", page_icon="💰", layout="wide")
+st.set_page_config(page_title="Finance Tracker", page_icon="💰")
 st.title("💰 Finance Tracker")
 
 # --- GitHub Save Function ---
@@ -46,26 +45,30 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 
 username = st.sidebar.text_input("Masukkan Username")
-password = st.sidebar.text_input("Password", type="password")
-login = st.sidebar.button("Login")
-
-if login:
-    if username and password:  # Simple validation only
-        st.session_state.username = username
-    else:
-        st.sidebar.error("Username dan Password wajib diisi")
-
-if not st.session_state.username:
+if username:
+    st.session_state.username = username
+else:
     st.stop()
 
 user_folder = f"data/{st.session_state.username}"
 os.makedirs(user_folder, exist_ok=True)
 user_csv_path = os.path.join(user_folder, "data.csv")
 
-if os.path.exists(user_csv_path):
-    df = pd.read_csv(user_csv_path, encoding="utf-8-sig")
-else:
-    df = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
+# --- Load Data or Create Fresh CSV ---
+def load_or_create_csv(path):
+    if os.path.exists(path):
+        try:
+            df = pd.read_csv(path, encoding="utf-8-sig")
+        except:
+            st.error("❌ File rusak, akan dibuat ulang.")
+            df = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
+            df.to_csv(path, index=False, encoding="utf-8-sig")
+    else:
+        df = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
+        df.to_csv(path, index=False, encoding="utf-8-sig")
+    return df
+
+df = load_or_create_csv(user_csv_path)
 
 # --- Input Data ---
 st.markdown("## ➕ Tambah Data Baru")
@@ -75,7 +78,7 @@ with st.expander("Input Data Manual"):
         pemasukan = st.number_input("⬆️ Pemasukan (Rp)", min_value=0)
         pengeluaran = st.number_input("⬇️ Pengeluaran (Rp)", min_value=0)
         kategori = st.text_input("🏷️ Kategori", value="Umum")
-        submit = st.form_submit_button("💾 Simpan")
+        submit = st.form_submit_button("📂 Simpan")
 
         if submit:
             new_row = pd.DataFrame({
@@ -98,28 +101,22 @@ df["pemasukan"] = pd.to_numeric(df["pemasukan"], errors="coerce").fillna(0)
 df["pengeluaran"] = pd.to_numeric(df["pengeluaran"], errors="coerce").fillna(0)
 df["saldo"] = df["pemasukan"].cumsum() - df["pengeluaran"].cumsum()
 
-# --- Filter Data ---
-st.sidebar.header("📆 Filter Data")
-tgl_awal = st.sidebar.date_input("Tanggal Awal", df["tanggal"].min().date() if not df.empty else dt.date.today())
-tgl_akhir = st.sidebar.date_input("Tanggal Akhir", df["tanggal"].max().date() if not df.empty else dt.date.today())
-df_filtered = df[(df["tanggal"] >= pd.to_datetime(tgl_awal)) & (df["tanggal"] <= pd.to_datetime(tgl_akhir))]
-
 # --- Ringkasan ---
 st.markdown("## 📊 Ringkasan")
-if not df_filtered.empty:
-    st.metric("💰 Total Saldo", f"Rp {df_filtered['saldo'].iloc[-1]:,.0f}")
-    st.metric("📈 Total Pemasukan", f"Rp {df_filtered['pemasukan'].sum():,.0f}")
-    st.metric("📉 Total Pengeluaran", f"Rp {df_filtered['pengeluaran'].sum():,.0f}")
+if not df.empty:
+    st.metric("💰 Total Saldo", f"Rp {df['saldo'].iloc[-1]:,.0f}")
+    st.metric("📈 Total Pemasukan", f"Rp {df['pemasukan'].sum():,.0f}")
+    st.metric("📉 Total Pengeluaran", f"Rp {df['pengeluaran'].sum():,.0f}")
 else:
-    st.warning("Tidak ada data pada rentang tanggal tersebut.")
+    st.warning("Belum ada data.")
 
 # --- Grafik Saldo ---
 st.markdown("## 🗓️ Grafik Saldo")
 periode = st.selectbox("Pilih Periode", ["Harian", "Mingguan", "Bulanan", "Tahunan"])
-chart_type = st.radio("Tipe Grafik", ["Line Chart", "Area Chart"], horizontal=True)
+chart_type = st.radio("Tipe Grafik", ["Line Chart", "Area Chart"])
 
 resample_map = {"Harian": "D", "Mingguan": "W", "Bulanan": "M", "Tahunan": "Y"}
-df_chart = df_filtered.set_index("tanggal").resample(resample_map[periode]).sum(numeric_only=True)
+df_chart = df.set_index("tanggal").resample(resample_map[periode]).sum(numeric_only=True)
 df_chart["saldo"] = df_chart["pemasukan"].cumsum() - df_chart["pengeluaran"].cumsum()
 
 fig, ax = plt.subplots(figsize=(12, 5))
@@ -135,8 +132,8 @@ ax.grid(True, linestyle="--", alpha=0.5)
 st.pyplot(fig)
 
 # --- Pie Chart Pengeluaran ---
-st.markdown("## 🡝 Persentase Pengeluaran per Kategori")
-df_expense = df_filtered[df_filtered["pengeluaran"] > 0]
+st.markdown("## 🔝 Persentase Pengeluaran per Kategori")
+df_expense = df[df["pengeluaran"] > 0]
 if not df_expense.empty:
     kategori_data = df_expense.groupby("kategori")["pengeluaran"].sum()
     warna = ["#%06x" % random.randint(0, 0xFFFFFF) for _ in kategori_data]
@@ -153,19 +150,19 @@ if not df_expense.empty:
 
 # --- History & Edit ---
 with st.expander("📄 Lihat Riwayat Transaksi"):
-    st.dataframe(df_filtered.sort_values("tanggal", ascending=False))
+    st.dataframe(df.sort_values("tanggal", ascending=False))
     if st.button("✏️ Edit / Hapus Transaksi"):
-        idx_list = list(df_filtered.index)
+        idx_list = list(df.index)
         selected_index = st.selectbox("Pilih Index", idx_list)
-        selected_row = df_filtered.loc[selected_index]
+        selected_row = df.loc[selected_index]
 
         with st.form("edit_form"):
             new_tanggal = st.date_input("Tanggal", selected_row["tanggal"].date())
             new_pemasukan = st.number_input("Pemasukan", value=int(selected_row["pemasukan"]))
             new_pengeluaran = st.number_input("Pengeluaran", value=int(selected_row["pengeluaran"]))
             new_kategori = st.text_input("Kategori", value=selected_row["kategori"])
-            simpan = st.form_submit_button("💾 Simpan")
-            hapus = st.form_submit_button("🗑️ Hapus")
+            simpan = st.form_submit_button("📂 Simpan")
+            hapus = st.form_submit_button("🔝 Hapus")
 
             if simpan:
                 df.at[selected_index, "tanggal"] = str(new_tanggal)
@@ -180,14 +177,7 @@ with st.expander("📄 Lihat Riwayat Transaksi"):
                 df = df.drop(index=selected_index).reset_index(drop=True)
                 df.to_csv(user_csv_path, index=False, encoding="utf-8-sig")
                 simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
-                st.success("🗑️ Data berhasil dihapus!")
-
-# --- Export ke Excel ---
-st.markdown("## 📥 Unduh Data")
-if st.button("⬇️ Unduh sebagai Excel"):
-    output = BytesIO()
-    df.to_excel(output, index=False, engine="xlsxwriter")
-    st.download_button("📥 Klik untuk Unduh", data=output.getvalue(), file_name="finance_data.xlsx")
+                st.success("🔝 Data berhasil dihapus!")
 
 # --- Footer ---
 st.markdown("""
