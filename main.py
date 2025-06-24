@@ -121,6 +121,19 @@ st.write(f"Tipe data pengeluaran: {df['pengeluaran'].dtype}")
 st.write(f"Total pemasukan: Rp {df['pemasukan'].sum():,.0f}")
 st.write(f"Total pengeluaran: Rp {df['pengeluaran'].sum():,.0f}")
 
+st.subheader("🧪 Debug Info")
+st.write("Isi DataFrame (5 data pertama):")
+st.write(df.head())
+
+st.write("Tipe DataFrame:")
+st.write(df.dtypes)
+
+st.write("Cek NaN:")
+st.write(df.isna().sum())
+
+st.write("Total pemasukan:", df['pemasukan'].sum())
+st.write("Total pengeluaran:", df['pengeluaran'].sum())
+
 # --- Perhitungan dan Visualisasi ---
 df["tanggal"] = pd.to_datetime(df["tanggal"])
 df = df.sort_values("tanggal")
