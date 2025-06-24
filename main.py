@@ -3,82 +3,71 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
-# --- Setup ---
-st.set_page_config(page_title="Prediksi Pendapatan", page_icon="💼")
-st.title("💼 Prediksi Pendapatan")
-st.write("Prediksi pendapatan berdasarkan jam kerja dan jumlah klien per minggu.")
+# --- Setup halaman ---
+st.set_page_config(page_title="Prediksi Keuangan", page_icon="💰")
 
-# --- Load Dataset ---
-url = "https://raw.githubusercontent.com/UdinTarmiji/finance-data/main/data/finance_data.csv"
+st.title("📈 Prediksi Pemasukan Berdasarkan Pengeluaran")
+st.write("Aplikasi ini memprediksi pemasukan harian berdasarkan pengeluaran menggunakan model Machine Learning sederhana.")
+
+# --- Load Dataset dari GitHub ---
+url = "https://raw.githubusercontent.com/UdinTarmiji/finance-data/main/data/finance.csv"
 data = pd.read_csv(url)
 
-# --- Train Model ---
-x = data[["jam_kerja", "jumlah_klien"]]
-y = data["pendapatan"]
+# --- Model Training ---
+x = data[["pengeluaran"]]
+y = data["pemasukan"]
 model = LinearRegression()
 model.fit(x, y)
 
 # --- Input User ---
-st.header("🔢 Masukkan Data")
-jam = st.slider("🕒 Jam kerja per minggu:", 0, 100, 40)
-klien = st.slider("👥 Jumlah klien:", 0, 20, 4)
+st.header("🔢 Masukkan Pengeluaran Harian")
+user_pengeluaran = st.number_input("Masukkan nominal pengeluaran (Rp):", min_value=0, step=10000)
 
-# --- Prediksi ---
-if st.button("🎯 Prediksi Sekarang"):
-    hasil = model.predict([[jam, klien]])
+# --- History Prediksi ---
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+if st.button("🎯 Prediksi"):
+    hasil = model.predict([[user_pengeluaran]])
     prediksi = int(hasil[0])
-    st.success(f"💵 Prediksi Pendapatan: Rp {prediksi:,}")
+    st.success(f"💸 Prediksi pemasukan: Rp {prediksi:,}")
+    
+    # Simpan ke history
+    st.session_state.history.append({"pengeluaran": user_pengeluaran, "pemasukan": prediksi})
 
-    # feedback berdasarkan hasil
-    if prediksi >= 10_000_000:
-        st.balloons()
-        st.write("🔥 Wah pendapatanmu luar biasa!")
-    elif prediksi >= 5_000_000:
-        st.write("🧠 Kerja cerdas! Pendapatanmu sudah bagus.")
+    # Feedback
+    if prediksi > user_pengeluaran:
+        st.write("✅ Potensi untung, pemasukan lebih besar dari pengeluaran.")
     else:
-        st.write("📈 Tetap semangat! Masih bisa ditingkatkan.")
+        st.write("⚠️ Hati-hati! Bisa jadi defisit.")
 
-    # Download hasil prediksi
-    hasil_df = pd.DataFrame({
-        "Jam Kerja": [jam],
-        "Jumlah Klien": [klien],
-        "Prediksi Pendapatan": [prediksi]
-    })
-    st.download_button("💾 Download Hasil", hasil_df.to_csv(index=False), "hasil_prediksi.csv")
+# --- Riwayat Prediksi ---
+if st.session_state.history:
+    st.subheader("📂 Riwayat Prediksi")
+    history_df = pd.DataFrame(st.session_state.history)
+    st.dataframe(history_df)
 
-# --- Lihat Data Pelatihan ---
-with st.expander("📊 Lihat data pelatihan"):
-    st.dataframe(data)
-
-# --- Upload Data Sendiri ---
-st.header("📁 Upload Data Anda (Opsional)")
-uploaded = st.file_uploader("Upload file CSV")
-if uploaded:
-    user_data = pd.read_csv(uploaded)
-    st.dataframe(user_data)
-
-# --- Visualisasi Tambahan ---
-st.header("📈 Visualisasi")
-col1, col2 = st.columns(2)
-
-with col1:
+    # Visualisasi History
+    st.subheader("📊 Grafik Riwayat Prediksi")
     fig1, ax1 = plt.subplots()
-    ax1.scatter(data["jam_kerja"], data["pendapatan"], color='blue')
-    ax1.set_xlabel("Jam Kerja")
-    ax1.set_ylabel("Pendapatan")
-    ax1.set_title("Jam Kerja vs Pendapatan")
-    ax1.grid(True)
+    ax1.plot(history_df["pengeluaran"], history_df["pemasukan"], marker='o', linestyle='-')
+    ax1.set_xlabel("Pengeluaran (Rp)")
+    ax1.set_ylabel("Pemasukan (Rp)")
+    ax1.set_title("Riwayat Prediksi Pengeluaran vs Pemasukan")
     st.pyplot(fig1)
 
-with col2:
-    fig2, ax2 = plt.subplots()
-    ax2.scatter(data["jumlah_klien"], data["pendapatan"], color='green')
-    ax2.set_xlabel("Jumlah Klien")
-    ax2.set_ylabel("Pendapatan")
-    ax2.set_title("Jumlah Klien vs Pendapatan")
-    ax2.grid(True)
-    st.pyplot(fig2)
+# --- Visualisasi Dataset Asli ---
+st.subheader("📉 Visualisasi Dataset Asli")
+fig2, ax2 = plt.subplots()
+ax2.scatter(data["pengeluaran"], data["pemasukan"], color='blue', label="Data asli")
+ax2.plot(data["pengeluaran"], model.predict(data[["pengeluaran"]]), color='red', label="Model prediksi")
+ax2.set_xlabel("Pengeluaran")
+ax2.set_ylabel("Pemasukan")
+ax2.set_title("Data Asli & Garis Prediksi")
+ax2.grid(True)
+ax2.legend()
+st.pyplot(fig2)
 
 # --- Footer ---
 st.markdown("---")
-st.caption("Made by Dafiq | Powered by Machine Learning")
+st.caption("Dibuat oleh Dafiq • Powered by Machine Learning & Streamlit")
