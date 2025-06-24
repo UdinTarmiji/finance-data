@@ -111,6 +111,16 @@ if kategori_filter:
 df["pemasukan"] = pd.to_numeric(df["pemasukan"], errors="coerce").fillna(0)
 df["pengeluaran"] = pd.to_numeric(df["pengeluaran"], errors="coerce").fillna(0)
 
+# --- DEBUG: Cek Data Terbaca ---
+st.write("🧪 Debug: Isi DataFrame")
+st.dataframe(df[["tanggal", "pemasukan", "pengeluaran"]].reset_index(drop=True))
+
+st.write(f"Jumlah baris: {len(df)}")
+st.write(f"Tipe data pemasukan: {df['pemasukan'].dtype}")
+st.write(f"Tipe data pengeluaran: {df['pengeluaran'].dtype}")
+st.write(f"Total pemasukan: Rp {df['pemasukan'].sum():,.0f}")
+st.write(f"Total pengeluaran: Rp {df['pengeluaran'].sum():,.0f}")
+
 # --- Perhitungan dan Visualisasi ---
 df["tanggal"] = pd.to_datetime(df["tanggal"])
 df = df.sort_values("tanggal")
