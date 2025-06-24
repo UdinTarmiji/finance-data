@@ -10,6 +10,8 @@ import requests
 
 st.set_page_config(page_title="Finance Tracker", page_icon="💰")
 st.title("💰 Aplikasi Analisis Keuangan Harian")
+st.write("Versi Streamlit:", st.__version__)
+
 
 # --- GitHub Save Function ---
 def simpan_ke_github(dataframe, filepath):
@@ -81,7 +83,7 @@ if st.session_state.get("show_form"):
             df_manual.to_csv(user_csv_path, index=False)
             simpan_ke_github(df_manual, f"data/{st.session_state.username}/data.csv")
             st.success("✅ Data berhasil ditambahkan!")
-            st.experimental_rerun()
+            st.rerun()
 
 # --- Load Data ---
 df = pd.read_csv(user_csv_path, parse_dates=["tanggal"])
