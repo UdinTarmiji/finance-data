@@ -1,58 +1,84 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
 
-# --- Setup Page ---
-st.set_page_config(page_title="Analis Keuangan", page_icon="📊")
-st.title("📊Analis Keuangan")
-st.write("Analisis pemasukan dan pengeluaran perusahaan dengan bantuan program sederhana.")
+# --- Setup ---
+st.set_page_config(page_title="Prediksi Pendapatan", page_icon="💼")
+st.title("💼 Prediksi Pendapatan")
+st.write("Prediksi pendapatan berdasarkan jam kerja dan jumlah klien per minggu.")
 
 # --- Load Dataset ---
 url = "https://raw.githubusercontent.com/UdinTarmiji/finance-data/main/data/finance_data.csv"
 data = pd.read_csv(url)
-st.write("✅ CSV berhasil dimuat:", data.head())
 
-# --- Proses Data ---
-data["profit"] = data["pemasukan"] - data["pengeluaran"]
-total_income = data["pemasukan"].sum()
-total_expense = data["pengeluaran"].sum()
-total_profit = data["profit"].sum()
-average_profit = data["profit"].mean()
+# --- Train Model ---
+x = data[["jam_kerja", "jumlah_klien"]]
+y = data["pendapatan"]
+model = LinearRegression()
+model.fit(x, y)
 
-# --- Tampilkan Ringkasan ---
-st.header("📄 Ringkasan Keuangan")
-st.metric("Total Pemasukan", f"Rp {total_income:,.0f}")
-st.metric("Total Pengeluaran", f"Rp {total_expense:,.0f}")
-st.metric("Total Profit", f"Rp {total_profit:,.0f}")
-st.metric("Rata-rata Profit Harian", f"Rp {average_profit:,.0f}")
+# --- Input User ---
+st.header("🔢 Masukkan Data")
+jam = st.slider("🕒 Jam kerja per minggu:", 0, 100, 40)
+klien = st.slider("👥 Jumlah klien:", 0, 20, 4)
 
-# --- Grafik ---
-st.header("📈 Grafik Keuangan")
-fig, ax = plt.subplots()
-ax.plot(data["tanggal"], data["pemasukan"], label="Pemasukan", marker="o")
-ax.plot(data["tanggal"], data["pengeluaran"], label="Pengeluaran", marker="o")
-ax.plot(data["tanggal"], data["profit"], label="Profit", linestyle="--", color="green")
-ax.set_xlabel("Tanggal")
-ax.set_ylabel("Rupiah")
-ax.set_title("Tren Keuangan")
-ax.legend()
-ax.grid(True)
-plt.xticks(rotation=45)
-st.pyplot(fig)
+# --- Prediksi ---
+if st.button("🎯 Prediksi Sekarang"):
+    hasil = model.predict([[jam, klien]])
+    prediksi = int(hasil[0])
+    st.success(f"💵 Prediksi Pendapatan: Rp {prediksi:,}")
 
-# --- Analisis AI Sederhana ---
-st.header("💬 Analisis")
-if total_profit > 5_000_000:
-    st.success("Performa keuangan sangat baik! 🚀")
-elif total_profit > 0:
-    st.info("Keuangan sehat, tetap dipantau. 👍")
-else:
-    st.warning("Pengeluaran lebih besar dari pemasukan! ⚠️")
+    # feedback berdasarkan hasil
+    if prediksi >= 10_000_000:
+        st.balloons()
+        st.write("🔥 Wah pendapatanmu luar biasa!")
+    elif prediksi >= 5_000_000:
+        st.write("🧠 Kerja cerdas! Pendapatanmu sudah bagus.")
+    else:
+        st.write("📈 Tetap semangat! Masih bisa ditingkatkan.")
 
-# --- Lihat Data ---
-with st.expander("🔍 Lihat Tabel Data"):
+    # Download hasil prediksi
+    hasil_df = pd.DataFrame({
+        "Jam Kerja": [jam],
+        "Jumlah Klien": [klien],
+        "Prediksi Pendapatan": [prediksi]
+    })
+    st.download_button("💾 Download Hasil", hasil_df.to_csv(index=False), "hasil_prediksi.csv")
+
+# --- Lihat Data Pelatihan ---
+with st.expander("📊 Lihat data pelatihan"):
     st.dataframe(data)
+
+# --- Upload Data Sendiri ---
+st.header("📁 Upload Data Anda (Opsional)")
+uploaded = st.file_uploader("Upload file CSV")
+if uploaded:
+    user_data = pd.read_csv(uploaded)
+    st.dataframe(user_data)
+
+# --- Visualisasi Tambahan ---
+st.header("📈 Visualisasi")
+col1, col2 = st.columns(2)
+
+with col1:
+    fig1, ax1 = plt.subplots()
+    ax1.scatter(data["jam_kerja"], data["pendapatan"], color='blue')
+    ax1.set_xlabel("Jam Kerja")
+    ax1.set_ylabel("Pendapatan")
+    ax1.set_title("Jam Kerja vs Pendapatan")
+    ax1.grid(True)
+    st.pyplot(fig1)
+
+with col2:
+    fig2, ax2 = plt.subplots()
+    ax2.scatter(data["jumlah_klien"], data["pendapatan"], color='green')
+    ax2.set_xlabel("Jumlah Klien")
+    ax2.set_ylabel("Pendapatan")
+    ax2.set_title("Jumlah Klien vs Pendapatan")
+    ax2.grid(True)
+    st.pyplot(fig2)
 
 # --- Footer ---
 st.markdown("---")
-st.caption("Made by Dafiq")
+st.caption("Made by Dafiq | Powered by Machine Learning")
