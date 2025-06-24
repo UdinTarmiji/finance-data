@@ -11,7 +11,10 @@ st.title("💰 Aplikasi Analisis Keuangan Harian")
 st.sidebar.header("📤 Upload CSV")
 uploaded_file = st.sidebar.file_uploader("Unggah file CSV Anda", type=["csv"])
 
-# --- Input Manual ---
+# --- Initialize Manual Data ---
+if "manual_data" not in st.session_state:
+    st.session_state.manual_data = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
+
 # --- Tombol dan Modal untuk Input Manual ---
 if st.button("➕ Input Data Manual"):
     with st.modal("Input Data Keuangan Manual", key="modal_input"):
@@ -38,20 +41,6 @@ if st.button("➕ Input Data Manual"):
                 })
                 st.session_state.manual_data = pd.concat([st.session_state.manual_data, new_data], ignore_index=True)
                 st.success("Data berhasil ditambahkan!")
-
-# Simpan data manual ke state
-if "manual_data" not in st.session_state:
-    st.session_state.manual_data = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
-
-if submitted:
-    new_data = pd.DataFrame({
-        "tanggal": [dt.datetime.combine(tanggal_input, waktu_input)],
-        "pemasukan": [pemasukan_input],
-        "pengeluaran": [pengeluaran_input],
-        "kategori": [kategori_input if pengeluaran_input > 0 else "-"]
-    })
-    st.session_state.manual_data = pd.concat([st.session_state.manual_data, new_data], ignore_index=True)
-    st.success("✅ Data berhasil ditambahkan!")
 
 # --- Load Data ---
 if uploaded_file:
@@ -121,3 +110,4 @@ if "kategori" in df.columns and not df[df["pengeluaran"] > 0].empty:
 # --- Tabel Data ---
 with st.expander("📋 Lihat Data Lengkap"):
     st.dataframe(df.sort_values("tanggal", ascending=False))
+
