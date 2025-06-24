@@ -1,13 +1,13 @@
-# main.py (Final Version - Chart & History Fixes)
+# main.py (Stable Version - Final Fix)
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import datetime as dt
+import random
 import os
 import base64
 import json
 import requests
-import random
 
 st.set_page_config(page_title="Finance Tracker", page_icon="💰")
 st.title("💰 Finance Tracker")
@@ -22,7 +22,7 @@ def simpan_ke_github(dataframe, filepath):
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{filepath}"
     headers = {"Authorization": f"token {token}"}
     get_resp = requests.get(url, headers=headers)
-    sha = get_resp.json().get("sha") if get_resp.status_code == 200 else None
+    sha = get_resp.json()["sha"] if get_resp.status_code == 200 else None
 
     payload = {
         "message": "update data.csv",
@@ -71,7 +71,7 @@ with st.expander("Input Data Manual"):
 
         if submit:
             new_row = pd.DataFrame({
-                "tanggal": [tanggal],
+                "tanggal": [tanggal.strftime("%Y-%m-%d")],
                 "pemasukan": [pemasukan],
                 "pengeluaran": [pengeluaran],
                 "kategori": [kategori if pengeluaran > 0 else "-"]
@@ -81,58 +81,59 @@ with st.expander("Input Data Manual"):
             simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
             st.success("✅ Data berhasil ditambahkan!")
 
-# --- Saldo & Konversi Data ---
+# --- Preprocess ---
 df = df.dropna(subset=["tanggal"])
-df["tanggal"] = pd.to_datetime(df["tanggal"])
+df["tanggal"] = pd.to_datetime(df["tanggal"], errors="coerce")
+df = df.dropna(subset=["tanggal"])
+df = df.sort_values("tanggal")
 df["pemasukan"] = pd.to_numeric(df["pemasukan"], errors="coerce").fillna(0)
 df["pengeluaran"] = pd.to_numeric(df["pengeluaran"], errors="coerce").fillna(0)
-df = df.sort_values("tanggal")
 df["saldo"] = df["pemasukan"].cumsum() - df["pengeluaran"].cumsum()
 
 # --- Ringkasan ---
 st.markdown("## 📊 Ringkasan")
-st.metric("💰 Total Saldo", f"Rp {df['saldo'].iloc[-1]:,.0f}")
-st.metric("📈 Total Pemasukan", f"Rp {df['pemasukan'].sum():,.0f}")
-st.metric("📉 Total Pengeluaran", f"Rp {df['pengeluaran'].sum():,.0f}")
+total_pemasukan = df["pemasukan"].sum()
+total_pengeluaran = df["pengeluaran"].sum()
+total_saldo = total_pemasukan - total_pengeluaran
+st.metric("💰 Total Saldo", f"Rp {total_saldo:,.0f}")
+st.metric("📈 Total Pemasukan", f"Rp {total_pemasukan:,.0f}")
+st.metric("📉 Total Pengeluaran", f"Rp {total_pengeluaran:,.0f}")
 
-# --- Grafik Saldo ---
+# --- Pilih Periode & Chart ---
 st.markdown("## 📅 Grafik Saldo")
 periode = st.selectbox("Pilih Periode", ["Harian", "Mingguan", "Bulanan", "Tahunan"])
 chart_type = st.radio("Tipe Grafik", ["Line Chart", "Area Chart"])
+
 resample_map = {"Harian": "D", "Mingguan": "W", "Bulanan": "M", "Tahunan": "Y"}
+df_chart = df.set_index("tanggal").resample(resample_map[periode]).sum(numeric_only=True)
+df_chart["saldo"] = df_chart["pemasukan"].cumsum() - df_chart["pengeluaran"].cumsum()
 
-if not df.empty:
-    df_chart = df.set_index("tanggal").resample(resample_map[periode]).sum(numeric_only=True)
-    df_chart["saldo"] = df_chart["pemasukan"].cumsum() - df_chart["pengeluaran"].cumsum()
-    df_chart.index = df_chart.index.date
+fig, ax = plt.subplots(figsize=(10, 4))
+if chart_type == "Line Chart":
+    ax.plot(df_chart.index, df_chart["saldo"], color="blue")
+else:
+    ax.fill_between(df_chart.index, df_chart["saldo"], color="skyblue", alpha=0.5)
+    ax.plot(df_chart.index, df_chart["saldo"], color="blue")
 
-    fig, ax = plt.subplots(figsize=(10, 4))
-    if chart_type == "Line Chart":
-        ax.plot(df_chart.index, df_chart["saldo"], color="red", linewidth=4)
-    else:
-        ax.fill_between(df_chart.index, df_chart["saldo"], color="skyblue", alpha=0.5)
-        ax.plot(df_chart.index, df_chart["saldo"], color="blue", linewidth=4)
+ax.set_ylabel("Saldo (Rp)")
+ax.set_title(f"Perkembangan Saldo - {periode}")
+ax.grid(True, linestyle="--", alpha=0.5)
+st.pyplot(fig)
 
-    ax.set_ylabel("Saldo (Rp)")
-    ax.set_ylim(bottom=0)
-    ax.set_title(f"Perkembangan Saldo - {periode}")
-    ax.grid(True, linestyle="--", alpha=0.5)
-    st.pyplot(fig)
-
-# --- Pie Chart Pengeluaran ---
+# --- Pie Chart ---
 st.markdown("## 🧁 Persentase Pengeluaran per Kategori")
-df_pengeluaran = df[df["pengeluaran"] > 0]
-if not df_pengeluaran.empty and df_pengeluaran["kategori"].nunique() > 0:
-    kategori_data = df_pengeluaran.groupby("kategori")["pengeluaran"].sum()
+kategori_data = df[df["pengeluaran"] > 0].groupby("kategori")["pengeluaran"].sum()
+if not kategori_data.empty:
     warna = ["#%06x" % random.randint(0, 0xFFFFFF) for _ in kategori_data]
     fig2, ax2 = plt.subplots()
     ax2.pie(kategori_data, labels=kategori_data.index, autopct="%1.1f%%", startangle=90, colors=warna)
     ax2.axis("equal")
     st.pyplot(fig2)
-else:
-    st.info("Belum ada data pengeluaran untuk ditampilkan.")
+    st.markdown("### 💡 Detail Kategori")
+    for kategori, nominal in kategori_data.items():
+        st.write(f"🔹 {kategori}: Rp {nominal:,.0f}")
 
-# --- Tabel & Edit/Hapus ---
+# --- Tabel & Edit ---
 with st.expander("📄 Lihat Data Lengkap"):
     st.dataframe(df.sort_values("tanggal", ascending=False))
 
@@ -152,7 +153,7 @@ with st.expander("📄 Lihat Data Lengkap"):
             delete = st.form_submit_button("🗑️ Hapus")
 
             if save:
-                df.at[selected_index, "tanggal"] = new_tanggal
+                df.at[selected_index, "tanggal"] = new_tanggal.strftime("%Y-%m-%d")
                 df.at[selected_index, "pemasukan"] = new_pemasukan
                 df.at[selected_index, "pengeluaran"] = new_pengeluaran
                 df.at[selected_index, "kategori"] = new_kategori
