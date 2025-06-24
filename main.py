@@ -51,49 +51,40 @@ user_folder = f"data/{st.session_state.username}"
 os.makedirs(user_folder, exist_ok=True)
 user_csv_path = os.path.join(user_folder, "data.csv")
 
-if "manual_data" not in st.session_state:
-    if os.path.exists(user_csv_path):
-        st.session_state.manual_data = pd.read_csv(user_csv_path, parse_dates=["tanggal"])
-    else:
-        st.session_state.manual_data = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
+if os.path.exists(user_csv_path):
+    df_manual = pd.read_csv(user_csv_path, parse_dates=["tanggal"])
+else:
+    df_manual = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
 
+# --- Input Manual ---
 st.markdown("## ➕ Input Data Keuangan Manual")
 if st.button("Input Data Keuangan", type="primary"):
     st.session_state.show_form = True
 
 if st.session_state.get("show_form"):
     with st.form("form_input_manual", clear_on_submit=True):
-        tanggal = st.date_input("📅 Tanggal", dt.date.today())
+        tanggal = st.date_input("🗕️ Tanggal", dt.date.today())
         waktu = st.time_input("🕒 Waktu", dt.datetime.now().time())
-        pemasukan = st.number_input("📥 Pemasukan (Rp)", min_value=0, step=50000)
-        pengeluaran = st.number_input("📤 Pengeluaran (Rp)", min_value=0, step=50000)
+        pemasukan = st.number_input("📅 Pemasukan (Rp)", min_value=0, step=50000)
+        pengeluaran = st.number_input("📄 Pengeluaran (Rp)", min_value=0, step=50000)
         kategori = st.text_input("🏷️ Kategori Pengeluaran", value="Umum")
         simpan = st.form_submit_button("✅ Simpan")
         if simpan:
             waktu_komplit = dt.datetime.combine(tanggal, waktu)
             new_data = pd.DataFrame({
                 "tanggal": [waktu_komplit],
-                "pemasukan": [int(pemasukan)],
-                "pengeluaran": [int(pengeluaran)],
+                "pemasukan": [pemasukan],
+                "pengeluaran": [pengeluaran],
                 "kategori": [kategori if pengeluaran > 0 else "-"]
             })
-            st.session_state.manual_data = pd.concat([st.session_state.manual_data, new_data], ignore_index=True)
-            st.session_state.manual_data.to_csv(user_csv_path, index=False)
-            simpan_ke_github(st.session_state.manual_data, f"data/{st.session_state.username}/data.csv")
+            df_manual = pd.concat([df_manual, new_data], ignore_index=True)
+            df_manual.to_csv(user_csv_path, index=False)
+            simpan_ke_github(df_manual, f"data/{st.session_state.username}/data.csv")
             st.success("✅ Data berhasil ditambahkan!")
             st.session_state.show_form = False
-            st.experimental_rerun()
 
-st.sidebar.header("📤 Upload CSV")
-uploaded_file = st.sidebar.file_uploader("Unggah file CSV Anda", type=["csv"])
-
-if uploaded_file:
-    df = pd.read_csv(uploaded_file, parse_dates=["tanggal"])
-elif not st.session_state.manual_data.empty:
-    df = st.session_state.manual_data.copy()
-else:
-    st.warning("📎 Silakan upload file CSV atau input data manual terlebih dahulu.")
-    st.stop()
+# --- Load Data ---
+df = df_manual.copy()
 
 # --- Filter ---
 st.sidebar.subheader("🔍 Filter")
@@ -107,53 +98,31 @@ if start_date and end_date:
 if kategori_filter:
     df = df[df["kategori"].isin(kategori_filter)]
 
+# --- Debug Info ---
+st.subheader("🥪 Debug Info")
+st.write("Dataframe (5 baris pertama):", df.head())
+st.write("Tipe data:", df.dtypes)
+st.write("Jumlah NaN:", df.isna().sum())
+
 if df.empty:
-    st.warning("❗ Tidak ada data dalam rentang tanggal/kategori yang dipilih.")
+    st.warning("⚠️ Tidak ada data dalam rentang/kategori yang dipilih.")
     st.stop()
 
-# --- Pastikan data numerik ---
+# --- Hitung dan Visualisasi ---
 df["pemasukan"] = pd.to_numeric(df["pemasukan"], errors="coerce").fillna(0)
 df["pengeluaran"] = pd.to_numeric(df["pengeluaran"], errors="coerce").fillna(0)
-
-# --- DEBUG: Cek Data Terbaca ---
-st.write("🧪 Debug: Isi DataFrame")
-st.dataframe(df[["tanggal", "pemasukan", "pengeluaran"]].reset_index(drop=True))
-
-st.write(f"Jumlah baris: {len(df)}")
-st.write(f"Tipe data pemasukan: {df['pemasukan'].dtype}")
-st.write(f"Tipe data pengeluaran: {df['pengeluaran'].dtype}")
-st.write(f"Total pemasukan: Rp {df['pemasukan'].sum():,.0f}")
-st.write(f"Total pengeluaran: Rp {df['pengeluaran'].sum():,.0f}")
-
-st.subheader("🧪 Debug Info")
-st.write("Isi DataFrame (5 data pertama):")
-st.write(df.head())
-
-st.write("Tipe DataFrame:")
-st.write(df.dtypes)
-
-st.write("Cek NaN:")
-st.write(df.isna().sum())
-
-st.write("Total pemasukan:", df['pemasukan'].sum())
-st.write("Total pengeluaran:", df['pengeluaran'].sum())
-
-# --- Perhitungan dan Visualisasi ---
 df["tanggal"] = pd.to_datetime(df["tanggal"])
 df = df.sort_values("tanggal")
-st.write("🔍 Total pemasukan (debug):", df["pemasukan"].sum())
-st.write("🔍 Total pengeluaran (debug):", df["pengeluaran"].sum())
 df["saldo"] = df["pemasukan"].cumsum() - df["pengeluaran"].cumsum()
 
-# --- Total ---
 total_pemasukan = df["pemasukan"].sum()
 total_pengeluaran = df["pengeluaran"].sum()
 total_saldo = total_pemasukan - total_pengeluaran
 
 st.markdown("---")
 st.metric("💰 Total Saldo", f"Rp {total_saldo:,.0f}")
-st.metric("📥 Total Pemasukan", f"Rp {total_pemasukan:,.0f}")
-st.metric("📤 Total Pengeluaran", f"Rp {total_pengeluaran:,.0f}")
+st.metric("📅 Total Pemasukan", f"Rp {total_pemasukan:,.0f}")
+st.metric("📄 Total Pengeluaran", f"Rp {total_pengeluaran:,.0f}")
 
 st.markdown("## 📅 Pilih Periode dan Tipe Grafik")
 periode = st.selectbox("Tampilkan berdasarkan:", ["Harian", "Mingguan", "Bulanan", "Tahunan"])
@@ -198,7 +167,7 @@ ax.set_ylabel("Saldo (Rp)")
 ax.grid(True, linestyle='--', alpha=0.3)
 st.pyplot(fig)
 
-# --- Pie Chart Kategori Pengeluaran ---
+# --- Pie Chart ---
 if "kategori" in df.columns and not df[df["pengeluaran"] > 0].empty:
     st.subheader("📊 Distribusi Pengeluaran berdasarkan Kategori")
     kategori_data = df[df["pengeluaran"] > 0].groupby("kategori")["pengeluaran"].sum()
@@ -213,7 +182,7 @@ if "kategori" in df.columns and not df[df["pengeluaran"] > 0].empty:
         st.write(f"🔹 **{kategori}**: Rp {total:,.0f}")
 
 # --- Export ---
-st.download_button("📤 Unduh CSV", data=df.reset_index().to_csv(index=False).encode(), file_name="keuangan.csv", mime="text/csv")
+st.download_button("📄 Unduh CSV", data=df.reset_index().to_csv(index=False).encode(), file_name="keuangan.csv", mime="text/csv")
 
 # --- Dataframe ---
 with st.expander("📋 Lihat Data Lengkap"):
