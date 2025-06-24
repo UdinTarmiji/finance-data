@@ -3,36 +3,49 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import datetime as dt
 import random
+import os
 
 st.set_page_config(page_title="📊 Finance Tracker", page_icon="💰")
 st.title("💰 Aplikasi Analisis Keuangan Harian")
 
-# --- Inisialisasi Data Manual ---
-if "manual_data" not in st.session_state:
-    st.session_state.manual_data = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
+# --- Buat folder data user ---
+user_id = st.experimental_user.get("id", default=str(dt.datetime.now().timestamp()))
+user_data_folder = f"data/user_{user_id}"
+os.makedirs(user_data_folder, exist_ok=True)
+data_path = os.path.join(user_data_folder, "finance_data.csv")
 
-# --- Input Data Manual ---
-st.markdown("### ➕ Tambah Data Secara Manual")
-if st.button("Input Data Keuangan"):
-    with st.form("form_manual_input", clear_on_submit=True):
-        tanggal = st.date_input("📅 Tanggal", dt.date.today())
-        waktu = st.time_input("🕒 Waktu", dt.datetime.now().time())
-        pemasukan = st.number_input("📥 Pemasukan (Rp)", min_value=0, step=50000)
-        pengeluaran = st.number_input("📤 Pengeluaran (Rp)", min_value=0, step=50000)
-        kategori = st.text_input("🏷️ Kategori Pengeluaran", value="Umum")
-        simpan = st.form_submit_button("✅ Simpan Data")
-        if simpan:
-            waktu_komplit = dt.datetime.combine(tanggal, waktu)
-            st.session_state.manual_data = pd.concat([
-                st.session_state.manual_data,
-                pd.DataFrame({
+# --- Inisialisasi Manual Data ---
+if "manual_data" not in st.session_state:
+    if os.path.exists(data_path):
+        st.session_state.manual_data = pd.read_csv(data_path, parse_dates=["tanggal"])
+    else:
+        st.session_state.manual_data = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
+
+# --- Tombol Input Manual ---
+if st.button("➕ Input Data Keuangan Manual"):
+    with st.container():
+        st.markdown("### Tambahkan Data Baru")
+        with st.form("form_input_manual", clear_on_submit=True):
+            tanggal = st.date_input("📅 Tanggal", dt.date.today())
+            waktu = st.time_input("🕒 Waktu", dt.datetime.now().time())
+            pemasukan = st.number_input("📥 Pemasukan (Rp)", min_value=0, step=50000)
+            pengeluaran = st.number_input("📤 Pengeluaran (Rp)", min_value=0, step=50000)
+            kategori = st.text_input("🏷️ Kategori Pengeluaran", value="Umum")
+            simpan = st.form_submit_button("✅ Simpan")
+            if simpan:
+                waktu_komplit = dt.datetime.combine(tanggal, waktu)
+                new_entry = pd.DataFrame({
                     "tanggal": [waktu_komplit],
                     "pemasukan": [pemasukan],
                     "pengeluaran": [pengeluaran],
                     "kategori": [kategori if pengeluaran > 0 else "-"]
                 })
-            ], ignore_index=True)
-            st.success("✅ Data berhasil ditambahkan!")
+                st.session_state.manual_data = pd.concat([
+                    st.session_state.manual_data,
+                    new_entry
+                ], ignore_index=True)
+                st.session_state.manual_data.to_csv(data_path, index=False)
+                st.success("✅ Data berhasil ditambahkan!")
 
 # --- Upload CSV ---
 st.sidebar.header("📤 Upload CSV")
@@ -88,9 +101,9 @@ ax.grid(True, linestyle='--', alpha=0.3)
 ax.legend()
 st.pyplot(fig)
 
-# --- Visualisasi Pie Chart Kategori ---
+# --- Visualisasi Kategori Pie ---
 if "kategori" in df.columns and not df[df["pengeluaran"] > 0].empty:
-    st.subheader("📊 Distribusi Pengeluaran per Kategori")
+    st.subheader("📊 Distribusi Pengeluaran berdasarkan Kategori")
     kategori_data = df[df["pengeluaran"] > 0].groupby("kategori")["pengeluaran"].sum()
     warna = ["#%06x" % random.randint(0, 0xFFFFFF) for _ in range(len(kategori_data))]
     fig2, ax2 = plt.subplots()
