@@ -74,7 +74,7 @@ df = load_or_create_csv(user_csv_path)
 st.markdown("## ➕ Tambah Data Baru")
 with st.expander("Input Data Manual"):
     with st.form("input_data"):
-        tanggal = st.date_input("🗕️ Tanggal", dt.date.today())
+        tanggal = st.date_input("🗅️ Tanggal", dt.date.today())
         pemasukan = st.number_input("⬆️ Pemasukan (Rp)", min_value=0)
         pengeluaran = st.number_input("⬇️ Pengeluaran (Rp)", min_value=0)
         kategori = st.text_input("🏷️ Kategori", value="Umum")
@@ -83,7 +83,7 @@ with st.expander("Input Data Manual"):
         if submit:
             try:
                 new_row = pd.DataFrame({
-                    "tanggal": [str(tanggal)],
+                    "tanggal": [tanggal.strftime("%Y-%m-%d")],
                     "pemasukan": [pemasukan],
                     "pengeluaran": [pengeluaran],
                     "kategori": [kategori if pengeluaran > 0 else "-"]
@@ -135,7 +135,7 @@ ax.grid(True, linestyle="--", alpha=0.5)
 st.pyplot(fig)
 
 # --- Pie Chart Pengeluaran ---
-st.markdown("## 🔝 Persentase Pengeluaran per Kategori")
+st.markdown("## 🖁️ Persentase Pengeluaran per Kategori")
 df_expense = df[df["pengeluaran"] > 0]
 if not df_expense.empty:
     kategori_data = df_expense.groupby("kategori")["pengeluaran"].sum()
@@ -165,10 +165,10 @@ with st.expander("📄 Lihat Riwayat Transaksi"):
             new_pengeluaran = st.number_input("Pengeluaran", value=int(selected_row["pengeluaran"]))
             new_kategori = st.text_input("Kategori", value=selected_row["kategori"])
             simpan = st.form_submit_button("📂 Simpan")
-            hapus = st.form_submit_button("🔝 Hapus")
+            hapus = st.form_submit_button("🖁️ Hapus")
 
             if simpan:
-                df.at[selected_index, "tanggal"] = str(new_tanggal)
+                df.at[selected_index, "tanggal"] = new_tanggal.strftime("%Y-%m-%d")
                 df.at[selected_index, "pemasukan"] = new_pemasukan
                 df.at[selected_index, "pengeluaran"] = new_pengeluaran
                 df.at[selected_index, "kategori"] = new_kategori
@@ -180,7 +180,7 @@ with st.expander("📄 Lihat Riwayat Transaksi"):
                 df = df.drop(index=selected_index).reset_index(drop=True)
                 df.to_csv(user_csv_path, index=False, encoding="utf-8-sig")
                 simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
-                st.success("🔝 Data berhasil dihapus!")
+                st.success("🖁️ Data berhasil dihapus!")
 
 # --- Footer ---
 st.markdown("""
