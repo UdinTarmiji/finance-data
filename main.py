@@ -41,7 +41,7 @@ else:
     st.error("❌ Gagal menyimpan ke GitHub")
     st.write(response.json())
 
---- USERNAME LOGIN ---
+#--- USERNAME LOGIN ---
 
 st.sidebar.header("🔐 Login Pengguna") if "username" not in st.session_state: st.session_state.username = ""
 
@@ -51,7 +51,7 @@ user_folder = f"data/{st.session_state.username}" os.makedirs(user_folder, exist
 
 if os.path.exists(user_csv_path): df = pd.read_csv(user_csv_path, parse_dates=["tanggal"]) else: df = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
 
---- Input Data ---
+#--- Input Data ---
 
 st.markdown("## ➕ Tambah Data Baru") with st.expander("Input Data Manual"): with st.form("input_data"): tanggal = st.date_input("📅 Tanggal", dt.date.today()) pemasukan = st.number_input("⬆️ Pemasukan (Rp)", min_value=0) pengeluaran = st.number_input("⬇️ Pengeluaran (Rp)", min_value=0) kategori = st.text_input("🏷️ Kategori", value="Umum") submit = st.form_submit_button("💾 Simpan")
 
