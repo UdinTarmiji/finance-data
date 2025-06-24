@@ -1,13 +1,13 @@
-# main.py (Final Version)
+# main.py (Final Version - Chart & History Fixes)
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import datetime as dt
-import random
 import os
 import base64
 import json
 import requests
+import random
 
 st.set_page_config(page_title="Finance Tracker", page_icon="💰")
 st.title("💰 Finance Tracker")
@@ -22,7 +22,7 @@ def simpan_ke_github(dataframe, filepath):
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{filepath}"
     headers = {"Authorization": f"token {token}"}
     get_resp = requests.get(url, headers=headers)
-    sha = get_resp.json()["sha"] if get_resp.status_code == 200 else None
+    sha = get_resp.json().get("sha") if get_resp.status_code == 200 else None
 
     payload = {
         "message": "update data.csv",
@@ -39,7 +39,7 @@ def simpan_ke_github(dataframe, filepath):
         st.error("❌ Gagal menyimpan ke GitHub")
         st.write(response.json())
 
-# --- LOGIN ---
+# --- USERNAME LOGIN ---
 st.sidebar.header("🔐 Login Pengguna")
 if "username" not in st.session_state:
     st.session_state.username = ""
@@ -54,21 +54,20 @@ user_folder = f"data/{st.session_state.username}"
 os.makedirs(user_folder, exist_ok=True)
 user_csv_path = os.path.join(user_folder, "data.csv")
 
-# --- Load Data ---
 if os.path.exists(user_csv_path):
     df = pd.read_csv(user_csv_path, parse_dates=["tanggal"])
 else:
     df = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
 
-# --- Input Manual ---
+# --- Input Data ---
 st.markdown("## ➕ Tambah Data Baru")
 with st.expander("Input Data Manual"):
     with st.form("input_data"):
-        tanggal = st.date_input("🗕️ Tanggal", dt.date.today())
+        tanggal = st.date_input("📅 Tanggal", dt.date.today())
         pemasukan = st.number_input("⬆️ Pemasukan (Rp)", min_value=0)
         pengeluaran = st.number_input("⬇️ Pengeluaran (Rp)", min_value=0)
         kategori = st.text_input("🏷️ Kategori", value="Umum")
-        submit = st.form_submit_button("📂 Simpan")
+        submit = st.form_submit_button("💾 Simpan")
 
         if submit:
             new_row = pd.DataFrame({
@@ -82,9 +81,9 @@ with st.expander("Input Data Manual"):
             simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
             st.success("✅ Data berhasil ditambahkan!")
 
-# --- Persiapan Data ---
+# --- Saldo & Konversi Data ---
 df = df.dropna(subset=["tanggal"])
-df["tanggal"] = pd.to_datetime(df["tanggal"]).dt.date
+df["tanggal"] = pd.to_datetime(df["tanggal"])
 df["pemasukan"] = pd.to_numeric(df["pemasukan"], errors="coerce").fillna(0)
 df["pengeluaran"] = pd.to_numeric(df["pengeluaran"], errors="coerce").fillna(0)
 df = df.sort_values("tanggal")
@@ -92,49 +91,48 @@ df["saldo"] = df["pemasukan"].cumsum() - df["pengeluaran"].cumsum()
 
 # --- Ringkasan ---
 st.markdown("## 📊 Ringkasan")
-total_pemasukan = df["pemasukan"].sum()
-total_pengeluaran = df["pengeluaran"].sum()
-total_saldo = total_pemasukan - total_pengeluaran
-st.metric("💰 Total Saldo", f"Rp {total_saldo:,.0f}")
-st.metric("📈 Total Pemasukan", f"Rp {total_pemasukan:,.0f}")
-st.metric("📉 Total Pengeluaran", f"Rp {total_pengeluaran:,.0f}")
+st.metric("💰 Total Saldo", f"Rp {df['saldo'].iloc[-1]:,.0f}")
+st.metric("📈 Total Pemasukan", f"Rp {df['pemasukan'].sum():,.0f}")
+st.metric("📉 Total Pengeluaran", f"Rp {df['pengeluaran'].sum():,.0f}")
 
 # --- Grafik Saldo ---
-st.markdown("## 🗕️ Grafik Saldo")
+st.markdown("## 📅 Grafik Saldo")
 periode = st.selectbox("Pilih Periode", ["Harian", "Mingguan", "Bulanan", "Tahunan"])
 chart_type = st.radio("Tipe Grafik", ["Line Chart", "Area Chart"])
-
 resample_map = {"Harian": "D", "Mingguan": "W", "Bulanan": "M", "Tahunan": "Y"}
-df_chart = df.copy()
-df_chart["tanggal"] = pd.to_datetime(df_chart["tanggal"])
-df_chart = df_chart.set_index("tanggal").resample(resample_map[periode]).sum(numeric_only=True)
-df_chart["saldo"] = df_chart["pemasukan"].cumsum() - df_chart["pengeluaran"].cumsum()
 
-fig, ax = plt.subplots(figsize=(10, 4))
-if chart_type == "Line Chart":
-    ax.plot(df_chart.index, df_chart["saldo"], color="blue", linewidth=2)
-else:
-    ax.fill_between(df_chart.index, df_chart["saldo"], color="skyblue", alpha=0.5)
-    ax.plot(df_chart.index, df_chart["saldo"], color="blue", linewidth=2)
-ax.set_ylabel("Saldo (Rp)")
-ax.set_title(f"Perkembangan Saldo - {periode}")
-ax.grid(True, linestyle="--", alpha=0.5)
-st.pyplot(fig)
+if not df.empty:
+    df_chart = df.set_index("tanggal").resample(resample_map[periode]).sum(numeric_only=True)
+    df_chart["saldo"] = df_chart["pemasukan"].cumsum() - df_chart["pengeluaran"].cumsum()
+    df_chart.index = df_chart.index.date
 
-# --- Pie Chart ---
-st.markdown("## 🡝 Persentase Pengeluaran per Kategori")
-if not df[df["pengeluaran"] > 0].empty:
-    kategori_data = df[df["pengeluaran"] > 0].groupby("kategori")["pengeluaran"].sum()
+    fig, ax = plt.subplots(figsize=(10, 4))
+    if chart_type == "Line Chart":
+        ax.plot(df_chart.index, df_chart["saldo"], color="red", linewidth=2)
+    else:
+        ax.fill_between(df_chart.index, df_chart["saldo"], color="skyblue", alpha=0.5)
+        ax.plot(df_chart.index, df_chart["saldo"], color="blue", linewidth=2)
+
+    ax.set_ylabel("Saldo (Rp)")
+    ax.set_ylim(bottom=0)
+    ax.set_title(f"Perkembangan Saldo - {periode}")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    st.pyplot(fig)
+
+# --- Pie Chart Pengeluaran ---
+st.markdown("## 🧁 Persentase Pengeluaran per Kategori")
+df_pengeluaran = df[df["pengeluaran"] > 0]
+if not df_pengeluaran.empty and df_pengeluaran["kategori"].nunique() > 0:
+    kategori_data = df_pengeluaran.groupby("kategori")["pengeluaran"].sum()
     warna = ["#%06x" % random.randint(0, 0xFFFFFF) for _ in kategori_data]
     fig2, ax2 = plt.subplots()
     ax2.pie(kategori_data, labels=kategori_data.index, autopct="%1.1f%%", startangle=90, colors=warna)
     ax2.axis("equal")
     st.pyplot(fig2)
-    st.markdown("### 💡 Detail Kategori")
-    for kategori, nominal in kategori_data.items():
-        st.write(f"🔹 {kategori}: Rp {nominal:,.0f}")
+else:
+    st.info("Belum ada data pengeluaran untuk ditampilkan.")
 
-# --- History & Edit ---
+# --- Tabel & Edit/Hapus ---
 with st.expander("📄 Lihat Data Lengkap"):
     st.dataframe(df.sort_values("tanggal", ascending=False))
 
@@ -146,11 +144,11 @@ with st.expander("📄 Lihat Data Lengkap"):
         st.write("Transaksi Terpilih:", selected_row)
 
         with st.form("edit_form"):
-            new_tanggal = st.date_input("Tanggal", pd.to_datetime(selected_row["tanggal"]))
+            new_tanggal = st.date_input("Tanggal", selected_row["tanggal"].date())
             new_pemasukan = st.number_input("Pemasukan", value=int(selected_row["pemasukan"]))
             new_pengeluaran = st.number_input("Pengeluaran", value=int(selected_row["pengeluaran"]))
             new_kategori = st.text_input("Kategori", value=selected_row["kategori"])
-            save = st.form_submit_button("📂 Simpan Perubahan")
+            save = st.form_submit_button("💾 Simpan Perubahan")
             delete = st.form_submit_button("🗑️ Hapus")
 
             if save:
@@ -168,7 +166,7 @@ with st.expander("📄 Lihat Data Lengkap"):
                 simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
                 st.success("🗑️ Data berhasil dihapus!")
 
-st.download_button("📅 Unduh CSV", df.to_csv(index=False).encode(), "keuangan.csv")
+st.download_button("📥 Unduh CSV", df.to_csv(index=False).encode(), "keuangan.csv")
 
 # --- Footer ---
 st.markdown("""
@@ -176,4 +174,3 @@ st.markdown("""
 Made by Dafiq | Powered by Machine Learning  
 [📱 WhatsApp](https://wa.me/6281224280846) | [📧 Email](mailto:dafiqelhaq11@gmail.com) | [📷 Instagram](https://instagram.com/dafiqelhaq)
 """)
-
