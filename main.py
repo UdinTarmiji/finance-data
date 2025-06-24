@@ -68,6 +68,10 @@ else:
     st.warning("📎 Silakan upload file CSV atau input data manual terlebih dahulu.")
     st.stop()
 
+if df.empty:
+    st.warning("📎 Data masih kosong. Silakan input data terlebih dahulu.")
+    st.stop()
+
 # --- Preprocessing ---
 df["tanggal"] = pd.to_datetime(df["tanggal"])
 df = df.sort_values("tanggal")
@@ -100,34 +104,35 @@ elif periode == "Bulanan":
 else:
     df_grouped = df.resample("Y").sum(numeric_only=True)
 
-df_grouped["saldo"] = df_grouped["pemasukan"].cumsum() - df_grouped["pengeluaran"].cumsum()
-
-# --- Grafik Saldo ---
-st.subheader("📈 Grafik Saldo Akumulatif")
-fig, ax = plt.subplots(figsize=(10, 4))
-
-if tipe_grafik == "Gunung (Area Chart)":
-    ax.fill_between(df_grouped.index, df_grouped["saldo"], color="skyblue", alpha=0.5)
-    ax.plot(df_grouped.index, df_grouped["saldo"], color="blue")
+if df_grouped.empty or "pemasukan" not in df_grouped or "pengeluaran" not in df_grouped:
+    st.info("Grafik belum tersedia karena belum ada data pemasukan/pengeluaran.")
 else:
-    ax.plot(df_grouped.index, df_grouped["saldo"], color="green", linewidth=2)
+    df_grouped["saldo"] = df_grouped["pemasukan"].cumsum() - df_grouped["pengeluaran"].cumsum()
 
-# Konversi batas Y sesuai pilihan
-limits = {
-    "1Jt (lonjakan 100rb)": (1_000_000, 100_000),
-    "10Jt (lonjakan 500rb)": (10_000_000, 500_000),
-    "100Jt (lonjakan 5jt)": (100_000_000, 5_000_000),
-    "1M (lonjakan 50jt)": (1_000_000_000, 50_000_000),
-    "10M (lonjakan 500jt)": (10_000_000_000, 500_000_000)
-}
-y_max, y_step = limits[y_max_option]
-ax.set_ylim(0, y_max)
-ax.set_yticks(range(0, y_max + y_step, y_step))
+    # --- Grafik Saldo ---
+    st.subheader("📈 Grafik Saldo Akumulatif")
+    fig, ax = plt.subplots(figsize=(10, 4))
 
-ax.set_title(f"Saldo {periode}")
-ax.set_ylabel("Saldo (Rp)")
-ax.grid(True, linestyle='--', alpha=0.3)
-st.pyplot(fig)
+    if tipe_grafik == "Gunung (Area Chart)":
+        ax.fill_between(df_grouped.index, df_grouped["saldo"], color="skyblue", alpha=0.5)
+        ax.plot(df_grouped.index, df_grouped["saldo"], color="blue")
+    else:
+        ax.plot(df_grouped.index, df_grouped["saldo"], color="green", linewidth=2)
+
+    limits = {
+        "1Jt (lonjakan 100rb)": (1_000_000, 100_000),
+        "10Jt (lonjakan 500rb)": (10_000_000, 500_000),
+        "100Jt (lonjakan 5jt)": (100_000_000, 5_000_000),
+        "1M (lonjakan 50jt)": (1_000_000_000, 50_000_000),
+        "10M (lonjakan 500jt)": (10_000_000_000, 500_000_000)
+    }
+    y_max, y_step = limits[y_max_option]
+    ax.set_ylim(0, y_max)
+    ax.set_yticks(range(0, y_max + y_step, y_step))
+    ax.set_title(f"Saldo {periode}")
+    ax.set_ylabel("Saldo (Rp)")
+    ax.grid(True, linestyle='--', alpha=0.3)
+    st.pyplot(fig)
 
 # --- Visualisasi Kategori Pie ---
 if "kategori" in df.columns and not df[df["pengeluaran"] > 0].empty:
@@ -150,4 +155,4 @@ with st.expander("📋 Lihat Data Lengkap"):
 # --- Footer ---
 st.markdown("---")
 st.markdown("Made by Dafiq | Powered by Machine Learning")
-st.markdown("[📞 WhatsApp](https://wa.me/6281224280846) | [📸 Instagram](https://instagram.com/dafiqelhaq) | [📧 Email](mailto:dafiqelhaq11@gmail.com)")
+st.markdown("📱 [WhatsApp](https://wa.me/6281224280846) | 📸 [Instagram](https://instagram.com/dafiqelhaq) | 📧 [Email](mailto:dafiqelhaq11@gmail.com)")
