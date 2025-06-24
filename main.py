@@ -64,11 +64,11 @@ else:
 st.markdown("## ➕ Tambah Data Baru")
 with st.expander("Input Data Manual"):
     with st.form("input_data"):
-        tanggal = st.date_input("📅 Tanggal", dt.date.today())
+        tanggal = st.date_input("🗕️ Tanggal", dt.date.today())
         pemasukan = st.number_input("⬆️ Pemasukan (Rp)", min_value=0)
         pengeluaran = st.number_input("⬇️ Pengeluaran (Rp)", min_value=0)
         kategori = st.text_input("🏷️ Kategori", value="Umum")
-        submit = st.form_submit_button("💾 Simpan")
+        submit = st.form_submit_button("📂 Simpan")
 
         if submit:
             new_row = pd.DataFrame({
@@ -100,7 +100,7 @@ st.metric("📈 Total Pemasukan", f"Rp {total_pemasukan:,.0f}")
 st.metric("📉 Total Pengeluaran", f"Rp {total_pengeluaran:,.0f}")
 
 # --- Grafik Saldo ---
-st.markdown("## 📅 Grafik Saldo")
+st.markdown("## 🗕️ Grafik Saldo")
 periode = st.selectbox("Pilih Periode", ["Harian", "Mingguan", "Bulanan", "Tahunan"])
 chart_type = st.radio("Tipe Grafik", ["Line Chart", "Area Chart"])
 
@@ -122,7 +122,7 @@ ax.grid(True, linestyle="--", alpha=0.5)
 st.pyplot(fig)
 
 # --- Pie Chart ---
-st.markdown("## 🧁 Persentase Pengeluaran per Kategori")
+st.markdown("## 🡝 Persentase Pengeluaran per Kategori")
 if not df[df["pengeluaran"] > 0].empty:
     kategori_data = df[df["pengeluaran"] > 0].groupby("kategori")["pengeluaran"].sum()
     warna = ["#%06x" % random.randint(0, 0xFFFFFF) for _ in kategori_data]
@@ -150,7 +150,7 @@ with st.expander("📄 Lihat Data Lengkap"):
             new_pemasukan = st.number_input("Pemasukan", value=int(selected_row["pemasukan"]))
             new_pengeluaran = st.number_input("Pengeluaran", value=int(selected_row["pengeluaran"]))
             new_kategori = st.text_input("Kategori", value=selected_row["kategori"])
-            save = st.form_submit_button("💾 Simpan Perubahan")
+            save = st.form_submit_button("📂 Simpan Perubahan")
             delete = st.form_submit_button("🗑️ Hapus")
 
             if save:
@@ -168,7 +168,7 @@ with st.expander("📄 Lihat Data Lengkap"):
                 simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
                 st.success("🗑️ Data berhasil dihapus!")
 
-st.download_button("📥 Unduh CSV", df.to_csv(index=False).encode(), "keuangan.csv")
+st.download_button("📅 Unduh CSV", df.to_csv(index=False).encode(), "keuangan.csv")
 
 # --- Footer ---
 st.markdown("""
@@ -176,3 +176,4 @@ st.markdown("""
 Made by Dafiq | Powered by Machine Learning  
 [📱 WhatsApp](https://wa.me/6281224280846) | [📧 Email](mailto:dafiqelhaq11@gmail.com) | [📷 Instagram](https://instagram.com/dafiqelhaq)
 """)
+
