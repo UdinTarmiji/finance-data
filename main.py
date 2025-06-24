@@ -1,4 +1,4 @@
-# main.py (Versi Stabil & Final)
+# main.py (Versi Stabil & Final - Diperbarui dan Kompatibel Excel)
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -14,7 +14,7 @@ st.title("💰 Finance Tracker")
 
 # --- GitHub Save Function ---
 def simpan_ke_github(dataframe, filepath):
-    csv_content = dataframe.to_csv(index=False)
+    csv_content = dataframe.to_csv(index=False, encoding="utf-8-sig")
     token = st.secrets["github_token"]
     owner = st.secrets["repo_owner"]
     repo = st.secrets["repo_name"]
@@ -55,7 +55,7 @@ os.makedirs(user_folder, exist_ok=True)
 user_csv_path = os.path.join(user_folder, "data.csv")
 
 if os.path.exists(user_csv_path):
-    df = pd.read_csv(user_csv_path, parse_dates=["tanggal"])
+    df = pd.read_csv(user_csv_path, encoding="utf-8-sig")
 else:
     df = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
 
@@ -63,7 +63,7 @@ else:
 st.markdown("## ➕ Tambah Data Baru")
 with st.expander("Input Data Manual"):
     with st.form("input_data"):
-        tanggal = st.date_input("📅 Tanggal", dt.date.today())
+        tanggal = st.date_input("🗕️ Tanggal", dt.date.today())
         pemasukan = st.number_input("⬆️ Pemasukan (Rp)", min_value=0)
         pengeluaran = st.number_input("⬇️ Pengeluaran (Rp)", min_value=0)
         kategori = st.text_input("🏷️ Kategori", value="Umum")
@@ -71,19 +71,20 @@ with st.expander("Input Data Manual"):
 
         if submit:
             new_row = pd.DataFrame({
-                "tanggal": [tanggal],
+                "tanggal": [str(tanggal)],
                 "pemasukan": [pemasukan],
                 "pengeluaran": [pengeluaran],
                 "kategori": [kategori if pengeluaran > 0 else "-"]
             })
             df = pd.concat([df, new_row], ignore_index=True)
-            df.to_csv(user_csv_path, index=False)
+            df.to_csv(user_csv_path, index=False, encoding="utf-8-sig")
             simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
             st.success("✅ Data berhasil ditambahkan!")
 
 # --- Proses Data ---
 df = df.dropna(subset=["tanggal"])
-df["tanggal"] = pd.to_datetime(df["tanggal"])
+df["tanggal"] = pd.to_datetime(df["tanggal"], errors="coerce")
+df = df.dropna(subset=["tanggal"])
 df = df.sort_values("tanggal")
 df["pemasukan"] = pd.to_numeric(df["pemasukan"], errors="coerce").fillna(0)
 df["pengeluaran"] = pd.to_numeric(df["pengeluaran"], errors="coerce").fillna(0)
@@ -91,12 +92,15 @@ df["saldo"] = df["pemasukan"].cumsum() - df["pengeluaran"].cumsum()
 
 # --- Ringkasan ---
 st.markdown("## 📊 Ringkasan")
-st.metric("💰 Total Saldo", f"Rp {df['saldo'].iloc[-1]:,.0f}")
-st.metric("📈 Total Pemasukan", f"Rp {df['pemasukan'].sum():,.0f}")
-st.metric("📉 Total Pengeluaran", f"Rp {df['pengeluaran'].sum():,.0f}")
+if not df.empty:
+    st.metric("💰 Total Saldo", f"Rp {df['saldo'].iloc[-1]:,.0f}")
+    st.metric("📈 Total Pemasukan", f"Rp {df['pemasukan'].sum():,.0f}")
+    st.metric("📉 Total Pengeluaran", f"Rp {df['pengeluaran'].sum():,.0f}")
+else:
+    st.warning("Belum ada data.")
 
 # --- Grafik Saldo ---
-st.markdown("## 📅 Grafik Saldo")
+st.markdown("## 🗓️ Grafik Saldo")
 periode = st.selectbox("Pilih Periode", ["Harian", "Mingguan", "Bulanan", "Tahunan"])
 chart_type = st.radio("Tipe Grafik", ["Line Chart", "Area Chart"])
 
@@ -117,7 +121,7 @@ ax.grid(True, linestyle="--", alpha=0.5)
 st.pyplot(fig)
 
 # --- Pie Chart Pengeluaran ---
-st.markdown("## 🧁 Persentase Pengeluaran per Kategori")
+st.markdown("## 🡝 Persentase Pengeluaran per Kategori")
 df_expense = df[df["pengeluaran"] > 0]
 if not df_expense.empty:
     kategori_data = df_expense.groupby("kategori")["pengeluaran"].sum()
@@ -150,17 +154,17 @@ with st.expander("📄 Lihat Riwayat Transaksi"):
             hapus = st.form_submit_button("🗑️ Hapus")
 
             if simpan:
-                df.at[selected_index, "tanggal"] = new_tanggal
+                df.at[selected_index, "tanggal"] = str(new_tanggal)
                 df.at[selected_index, "pemasukan"] = new_pemasukan
                 df.at[selected_index, "pengeluaran"] = new_pengeluaran
                 df.at[selected_index, "kategori"] = new_kategori
-                df.to_csv(user_csv_path, index=False)
+                df.to_csv(user_csv_path, index=False, encoding="utf-8-sig")
                 simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
                 st.success("✅ Data berhasil diperbarui!")
 
             if hapus:
                 df = df.drop(index=selected_index).reset_index(drop=True)
-                df.to_csv(user_csv_path, index=False)
+                df.to_csv(user_csv_path, index=False, encoding="utf-8-sig")
                 simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
                 st.success("🗑️ Data berhasil dihapus!")
 
