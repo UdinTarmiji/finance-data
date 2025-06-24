@@ -107,6 +107,10 @@ if start_date and end_date:
 if kategori_filter:
     df = df[df["kategori"].isin(kategori_filter)]
 
+if df.empty:
+    st.warning("❗ Tidak ada data dalam rentang tanggal/kategori yang dipilih.")
+    st.stop()
+
 # --- Pastikan data numerik ---
 df["pemasukan"] = pd.to_numeric(df["pemasukan"], errors="coerce").fillna(0)
 df["pengeluaran"] = pd.to_numeric(df["pengeluaran"], errors="coerce").fillna(0)
