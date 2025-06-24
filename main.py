@@ -3,17 +3,38 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import datetime as dt
 import random
+import os
 
 st.set_page_config(page_title="📊 Finance Tracker", page_icon="💰")
 st.title("💰 Aplikasi Analisis Keuangan Harian")
 
+# --- USERNAME LOGIN PAGE ---
+if "username" not in st.session_state:
+    st.session_state.username = ""
+
+if not st.session_state.username:
+    st.session_state.username = st.text_input("Masukkan Username untuk Memulai:")
+    if not st.session_state.username:
+        st.stop()
+
+# Buat folder user jika belum ada
+user_folder = f"data/{st.session_state.username}"
+os.makedirs(user_folder, exist_ok=True)
+user_csv_path = os.path.join(user_folder, "data.csv")
+
 # --- Inisialisasi Manual Data ---
 if "manual_data" not in st.session_state:
-    st.session_state.manual_data = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
+    if os.path.exists(user_csv_path):
+        st.session_state.manual_data = pd.read_csv(user_csv_path, parse_dates=["tanggal"])
+    else:
+        st.session_state.manual_data = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
 
 # --- Tombol Input Manual ---
 st.markdown("## ➕ Input Data Keuangan Manual")
-with st.expander("Klik untuk input data keuangan"):
+if st.button("Input Data Keuangan"):
+    st.session_state.show_modal = True
+
+if st.session_state.get("show_modal"):
     with st.form("form_input_manual", clear_on_submit=True):
         tanggal = st.date_input("📅 Tanggal", dt.date.today())
         waktu = st.time_input("🕒 Waktu", dt.datetime.now().time())
@@ -23,16 +44,19 @@ with st.expander("Klik untuk input data keuangan"):
         simpan = st.form_submit_button("✅ Simpan")
         if simpan:
             waktu_komplit = dt.datetime.combine(tanggal, waktu)
+            new_data = pd.DataFrame({
+                "tanggal": [waktu_komplit],
+                "pemasukan": [pemasukan],
+                "pengeluaran": [pengeluaran],
+                "kategori": [kategori if pengeluaran > 0 else "-"]
+            })
             st.session_state.manual_data = pd.concat([
                 st.session_state.manual_data,
-                pd.DataFrame({
-                    "tanggal": [waktu_komplit],
-                    "pemasukan": [pemasukan],
-                    "pengeluaran": [pengeluaran],
-                    "kategori": [kategori if pengeluaran > 0 else "-"]
-                })
+                new_data
             ], ignore_index=True)
+            st.session_state.manual_data.to_csv(user_csv_path, index=False)
             st.success("✅ Data berhasil ditambahkan!")
+            st.session_state.show_modal = False
 
 # --- Upload CSV ---
 st.sidebar.header("📤 Upload CSV")
@@ -72,7 +96,6 @@ else:
     rule = {"Mingguan": "W", "Bulanan": "M", "Tahunan": "Y"}[periode]
     df_grouped = df.resample(rule, on="tanggal").sum(numeric_only=True)
 
-# Tambahkan kolom saldo
 df_grouped["saldo"] = df_grouped["pemasukan"] - df_grouped["pengeluaran"]
 
 # --- Visualisasi Gunung ---
