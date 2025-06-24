@@ -74,7 +74,7 @@ else:
 # --- Preprocessing ---
 df["tanggal"] = pd.to_datetime(df["tanggal"])
 df = df.sort_values("tanggal")
-df["saldo"] = df["pemasukan"] - df["pengeluaran"]
+df["saldo"] = df["pemasukan"].cumsum() - df["pengeluaran"].cumsum()
 
 # --- Statistik Total ---
 total_pemasukan = df["pemasukan"].sum()
@@ -90,19 +90,23 @@ st.metric("📤 Total Pengeluaran", f"Rp {total_pengeluaran:,.0f}")
 periode = st.selectbox("Tampilkan berdasarkan:", ["Harian", "Mingguan", "Bulanan", "Tahunan"])
 
 # --- Grup Data ---
+df.set_index("tanggal", inplace=True)
 if periode == "Harian":
-    df_grouped = df.groupby(df["tanggal"].dt.date).sum(numeric_only=True)
+    df_grouped = df.resample("D").sum(numeric_only=True)
+elif periode == "Mingguan":
+    df_grouped = df.resample("W").sum(numeric_only=True)
+elif periode == "Bulanan":
+    df_grouped = df.resample("M").sum(numeric_only=True)
 else:
-    rule = {"Mingguan": "W", "Bulanan": "M", "Tahunan": "Y"}[periode]
-    df_grouped = df.resample(rule, on="tanggal").sum(numeric_only=True)
+    df_grouped = df.resample("Y").sum(numeric_only=True)
 
-df_grouped["saldo"] = df_grouped["pemasukan"] - df_grouped["pengeluaran"]
+df_grouped["saldo"] = df_grouped["pemasukan"].cumsum() - df_grouped["pengeluaran"].cumsum()
 
 # --- Visualisasi Gunung ---
 st.subheader("📈 Grafik Saldo Akumulatif")
 fig, ax = plt.subplots(figsize=(10, 4))
-ax.fill_between(df_grouped.index, df_grouped["saldo"].cumsum(), color="skyblue", alpha=0.5)
-ax.plot(df_grouped.index, df_grouped["saldo"].cumsum(), color="blue")
+ax.fill_between(df_grouped.index, df_grouped["saldo"], color="skyblue", alpha=0.5)
+ax.plot(df_grouped.index, df_grouped["saldo"], color="blue")
 ax.set_title(f"Saldo {periode}")
 ax.set_ylabel("Saldo (Rp)")
 ax.set_ylim(0, 10_000_000)
@@ -126,4 +130,5 @@ if "kategori" in df.columns and not df[df["pengeluaran"] > 0].empty:
 
 # --- Tabel Data ---
 with st.expander("📋 Lihat Data Lengkap"):
-    st.dataframe(df.sort_values("tanggal", ascending=False))
+    st.dataframe(df.sort_index(ascending=False).reset_index())
+
