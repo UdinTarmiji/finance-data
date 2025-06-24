@@ -41,12 +41,41 @@ def simpan_ke_github(dataframe, filepath):
 # --- USERNAME LOGIN PAGE ---
 if "username" not in st.session_state:
     st.session_state.username = ""
+    st.session_state.logged_in = False
 
-if not st.session_state.username:
-    st.session_state.username = st.text_input("Masukkan Username untuk Memulai:")
-    if not st.session_state.username:
-        st.stop()
+if not st.session_state.get("logged_in"):
+    login_tab, register_tab = st.tabs(["Login", "Register"])
+    with login_tab:
+        st.subheader("🔑 Login")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        if st.button("Masuk"):
+            creds_path = f"data/{username}/credentials.json"
+            if os.path.exists(creds_path):
+                with open(creds_path) as f:
+                    creds = json.load(f)
+                if creds.get("password") == password:
+                    st.session_state.username = username
+                    st.session_state.logged_in = True
+                    st.experimental_rerun()
+                else:
+                    st.error("Password salah!")
+            else:
+                st.error("Akun tidak ditemukan.")
+    with register_tab:
+        st.subheader("📅 Register")
+        new_username = st.text_input("Buat Username")
+        new_password = st.text_input("Buat Password", type="password")
+        if st.button("Daftar"):
+            user_dir = f"data/{new_username}"
+            os.makedirs(user_dir, exist_ok=True)
+            creds_path = os.path.join(user_dir, "credentials.json")
+            with open(creds_path, "w") as f:
+                json.dump({"password": new_password}, f)
+            st.success("Akun berhasil dibuat. Silakan login.")
+    st.stop()
 
+# --- Load User Data ---
 user_folder = f"data/{st.session_state.username}"
 os.makedirs(user_folder, exist_ok=True)
 user_csv_path = os.path.join(user_folder, "data.csv")
@@ -82,6 +111,7 @@ if st.session_state.get("show_form"):
             simpan_ke_github(df_manual, f"data/{st.session_state.username}/data.csv")
             st.success("✅ Data berhasil ditambahkan!")
             st.session_state.show_form = False
+            st.experimental_rerun()
 
 # --- Load Data ---
 df = df_manual.copy()
@@ -98,12 +128,6 @@ if start_date and end_date:
 if kategori_filter:
     df = df[df["kategori"].isin(kategori_filter)]
 
-# --- Debug Info ---
-st.subheader("🥪 Debug Info")
-st.write("Dataframe (5 baris pertama):", df.head())
-st.write("Tipe data:", df.dtypes)
-st.write("Jumlah NaN:", df.isna().sum())
-
 if df.empty:
     st.warning("⚠️ Tidak ada data dalam rentang/kategori yang dipilih.")
     st.stop()
@@ -115,6 +139,7 @@ df["tanggal"] = pd.to_datetime(df["tanggal"])
 df = df.sort_values("tanggal")
 df["saldo"] = df["pemasukan"].cumsum() - df["pengeluaran"].cumsum()
 
+# --- Total ---
 total_pemasukan = df["pemasukan"].sum()
 total_pengeluaran = df["pengeluaran"].sum()
 total_saldo = total_pemasukan - total_pengeluaran
@@ -124,6 +149,7 @@ st.metric("💰 Total Saldo", f"Rp {total_saldo:,.0f}")
 st.metric("📅 Total Pemasukan", f"Rp {total_pemasukan:,.0f}")
 st.metric("📄 Total Pengeluaran", f"Rp {total_pengeluaran:,.0f}")
 
+# --- Grafik ---
 st.markdown("## 📅 Pilih Periode dan Tipe Grafik")
 periode = st.selectbox("Tampilkan berdasarkan:", ["Harian", "Mingguan", "Bulanan", "Tahunan"])
 tipe_grafik = st.radio("Jenis Visualisasi Saldo:", ["Gunung (Area Chart)", "Diagram (Line Chart)"])
@@ -142,7 +168,6 @@ else:
 
 df_grouped["saldo"] = df_grouped["pemasukan"].cumsum() - df_grouped["pengeluaran"].cumsum()
 
-# --- Grafik Saldo ---
 st.subheader("📈 Grafik Saldo Akumulatif")
 fig, ax = plt.subplots(figsize=(10, 4))
 
