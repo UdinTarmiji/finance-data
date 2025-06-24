@@ -112,7 +112,6 @@ if tipe_grafik == "Gunung (Area Chart)":
 else:
     ax.plot(df_grouped.index, df_grouped["saldo"], color="green", linewidth=2)
 
-# Konversi batas Y sesuai pilihan
 limits = {
     "1Jt (lonjakan 100rb)": (1_000_000, 100_000),
     "10Jt (lonjakan 500rb)": (10_000_000, 500_000),
