@@ -7,27 +7,22 @@ import random
 st.set_page_config(page_title="📊 Finance Tracker", page_icon="💰")
 st.title("💰 Aplikasi Analisis Keuangan Harian")
 
-# --- Upload CSV ---
-st.sidebar.header("📤 Upload CSV")
-uploaded_file = st.sidebar.file_uploader("Unggah file CSV Anda", type=["csv"])
-
-# --- Initialize Manual Data ---
+# --- Inisialisasi Manual Data ---
 if "manual_data" not in st.session_state:
     st.session_state.manual_data = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
 
-# --- Input Manual Modal ---
-st.sidebar.header("✏️ Input Manual")
-if st.sidebar.button("➕ Tambah Data Manual"):
-    with st.sidebar:
+# --- Tombol Input Manual ---
+if st.button("➕ Input Data Keuangan Manual"):
+    with st.container():
+        st.markdown("### Tambahkan Data Baru")
         with st.form("form_input_manual", clear_on_submit=True):
-            st.subheader("Input Data Keuangan Manual")
             tanggal = st.date_input("📅 Tanggal", dt.date.today())
             waktu = st.time_input("🕒 Waktu", dt.datetime.now().time())
             pemasukan = st.number_input("📥 Pemasukan (Rp)", min_value=0, step=50000)
             pengeluaran = st.number_input("📤 Pengeluaran (Rp)", min_value=0, step=50000)
             kategori = st.text_input("🏷️ Kategori Pengeluaran", value="Umum")
-            submit = st.form_submit_button("✅ Simpan")
-            if submit:
+            simpan = st.form_submit_button("✅ Simpan")
+            if simpan:
                 waktu_komplit = dt.datetime.combine(tanggal, waktu)
                 st.session_state.manual_data = pd.concat([
                     st.session_state.manual_data,
@@ -39,6 +34,10 @@ if st.sidebar.button("➕ Tambah Data Manual"):
                     })
                 ], ignore_index=True)
                 st.success("✅ Data berhasil ditambahkan!")
+
+# --- Upload CSV ---
+st.sidebar.header("📤 Upload CSV")
+uploaded_file = st.sidebar.file_uploader("Unggah file CSV Anda", type=["csv"])
 
 # --- Load Data ---
 if uploaded_file:
@@ -59,14 +58,13 @@ total_pemasukan = df["pemasukan"].sum()
 total_pengeluaran = df["pengeluaran"].sum()
 total_saldo = total_pemasukan - total_pengeluaran
 
-st.sidebar.markdown("---")
-st.sidebar.metric("💰 Total Saldo", f"Rp {total_saldo:,.0f}")
-st.sidebar.metric("📥 Total Pemasukan", f"Rp {total_pemasukan:,.0f}")
-st.sidebar.metric("📤 Total Pengeluaran", f"Rp {total_pengeluaran:,.0f}")
+st.markdown("---")
+st.metric("💰 Total Saldo", f"Rp {total_saldo:,.0f}")
+st.metric("📥 Total Pemasukan", f"Rp {total_pemasukan:,.0f}")
+st.metric("📤 Total Pengeluaran", f"Rp {total_pengeluaran:,.0f}")
 
 # --- Pilihan Waktu ---
-st.sidebar.header("⏱️ Opsi Visualisasi")
-waktu = st.sidebar.selectbox("Tampilkan berdasarkan:", ["Harian", "Mingguan", "Bulanan", "Tahunan"])
+waktu = st.selectbox("Tampilkan berdasarkan:", ["Harian", "Mingguan", "Bulanan", "Tahunan"])
 
 # --- Grup Data ---
 if waktu == "Harian":
@@ -79,7 +77,7 @@ elif waktu == "Tahunan":
     df_grouped = df.resample("Y", on="tanggal").sum(numeric_only=True)
 
 # --- Visualisasi Gunung ---
-st.subheader("📈 Grafik Keuangan")
+st.subheader("📈 Grafik Saldo Akumulatif")
 fig, ax = plt.subplots(figsize=(10, 4))
 ax.fill_between(df_grouped.index, df_grouped["saldo"].cumsum(), color="skyblue", alpha=0.5, label="Saldo")
 ax.plot(df_grouped.index, df_grouped["saldo"].cumsum(), color="blue")
