@@ -1,4 +1,4 @@
-# main.py (Final Version - Fixed Saldo and Chart)
+# main.py (Final Version - Perbaikan Grafik dan Saldo)
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -83,7 +83,7 @@ with st.expander("Input Data Manual"):
             simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
             st.success("✅ Data berhasil ditambahkan!")
 
-# --- Hitung Saldo ---
+# --- Proses Data ---
 df = df.dropna(subset=["tanggal"])
 df["tanggal"] = pd.to_datetime(df["tanggal"])
 df["pemasukan"] = pd.to_numeric(df["pemasukan"], errors="coerce").fillna(0)
@@ -107,14 +107,15 @@ chart_type = st.radio("Tipe Grafik", ["Line Chart", "Area Chart"])
 
 resample_map = {"Harian": "D", "Mingguan": "W", "Bulanan": "M", "Tahunan": "Y"}
 df_chart = df.set_index("tanggal").resample(resample_map[periode]).sum(numeric_only=True)
+df_chart = df_chart.fillna(0)
 df_chart["saldo"] = df_chart["pemasukan"].cumsum() - df_chart["pengeluaran"].cumsum()
 
 fig, ax = plt.subplots(figsize=(10, 4))
 if chart_type == "Line Chart":
-    ax.plot(df_chart.index, df_chart["saldo"], color="blue")
+    ax.plot(df_chart.index, df_chart["saldo"], color="blue", linewidth=2)
 else:
     ax.fill_between(df_chart.index, df_chart["saldo"], color="skyblue", alpha=0.5)
-    ax.plot(df_chart.index, df_chart["saldo"], color="blue")
+    ax.plot(df_chart.index, df_chart["saldo"], color="blue", linewidth=2)
 
 ax.set_ylabel("Saldo (Rp)")
 ax.set_title(f"Perkembangan Saldo - {periode}")
