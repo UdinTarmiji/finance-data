@@ -43,7 +43,9 @@ else:
 
 #--- USERNAME LOGIN ---
 
-st.sidebar.header("🔐 Login Pengguna") if "username" not in st.session_state: st.session_state.username = ""
+st.sidebar.header("🔐 Login Pengguna") 
+if "username" not in st.session_state: 
+    st.session_state.username = ""
 
 username = st.sidebar.text_input("Masukkan Username") if username: st.session_state.username = username else: st.stop()
 
