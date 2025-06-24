@@ -73,8 +73,8 @@ if st.session_state.get("show_form"):
             waktu_komplit = dt.datetime.combine(tanggal, waktu)
             new_data = pd.DataFrame({
                 "tanggal": [waktu_komplit],
-                "pemasukan": [pemasukan],
-                "pengeluaran": [pengeluaran],
+                "pemasukan": [int(pemasukan)],
+                "pengeluaran": [int(pengeluaran)],
                 "kategori": [kategori if pengeluaran > 0 else "-"]
             })
             st.session_state.manual_data = pd.concat([st.session_state.manual_data, new_data], ignore_index=True)
@@ -124,6 +124,8 @@ st.write(f"Total pengeluaran: Rp {df['pengeluaran'].sum():,.0f}")
 # --- Perhitungan dan Visualisasi ---
 df["tanggal"] = pd.to_datetime(df["tanggal"])
 df = df.sort_values("tanggal")
+st.write("🔍 Total pemasukan (debug):", df["pemasukan"].sum())
+st.write("🔍 Total pengeluaran (debug):", df["pengeluaran"].sum())
 df["saldo"] = df["pemasukan"].cumsum() - df["pengeluaran"].cumsum()
 
 # --- Total ---
