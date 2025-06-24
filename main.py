@@ -31,10 +31,10 @@ if "manual_data" not in st.session_state:
 
 # --- Tombol Input Manual ---
 st.markdown("## ➕ Input Data Keuangan Manual")
-if st.button("Input Data Keuangan"):
-    st.session_state.show_modal = True
+if st.button("Input Data Keuangan", type="primary"):
+    st.session_state.show_form = True
 
-if st.session_state.get("show_modal"):
+if st.session_state.get("show_form"):
     with st.form("form_input_manual", clear_on_submit=True):
         tanggal = st.date_input("📅 Tanggal", dt.date.today())
         waktu = st.time_input("🕒 Waktu", dt.datetime.now().time())
@@ -50,13 +50,10 @@ if st.session_state.get("show_modal"):
                 "pengeluaran": [pengeluaran],
                 "kategori": [kategori if pengeluaran > 0 else "-"]
             })
-            st.session_state.manual_data = pd.concat([
-                st.session_state.manual_data,
-                new_data
-            ], ignore_index=True)
+            st.session_state.manual_data = pd.concat([st.session_state.manual_data, new_data], ignore_index=True)
             st.session_state.manual_data.to_csv(user_csv_path, index=False)
             st.success("✅ Data berhasil ditambahkan!")
-            st.session_state.show_modal = False
+            st.session_state.show_form = False
 
 # --- Upload CSV ---
 st.sidebar.header("📤 Upload CSV")
@@ -87,7 +84,10 @@ st.metric("📥 Total Pemasukan", f"Rp {total_pemasukan:,.0f}")
 st.metric("📤 Total Pengeluaran", f"Rp {total_pengeluaran:,.0f}")
 
 # --- Pilihan Waktu ---
+st.markdown("## 📅 Pilih Periode dan Tipe Grafik")
 periode = st.selectbox("Tampilkan berdasarkan:", ["Harian", "Mingguan", "Bulanan", "Tahunan"])
+tipe_grafik = st.radio("Jenis Visualisasi Saldo:", ["Gunung (Area Chart)", "Diagram (Line Chart)"])
+y_max_option = st.selectbox("Batas Maksimum Y (Rp):", ["1Jt (lonjakan 100rb)", "10Jt (lonjakan 500rb)", "100Jt (lonjakan 5jt)", "1M (lonjakan 50jt)", "10M (lonjakan 500jt)"])
 
 # --- Grup Data ---
 df.set_index("tanggal", inplace=True)
@@ -102,15 +102,30 @@ else:
 
 df_grouped["saldo"] = df_grouped["pemasukan"].cumsum() - df_grouped["pengeluaran"].cumsum()
 
-# --- Visualisasi Gunung ---
+# --- Grafik Saldo ---
 st.subheader("📈 Grafik Saldo Akumulatif")
 fig, ax = plt.subplots(figsize=(10, 4))
-ax.fill_between(df_grouped.index, df_grouped["saldo"], color="skyblue", alpha=0.5)
-ax.plot(df_grouped.index, df_grouped["saldo"], color="blue")
+
+if tipe_grafik == "Gunung (Area Chart)":
+    ax.fill_between(df_grouped.index, df_grouped["saldo"], color="skyblue", alpha=0.5)
+    ax.plot(df_grouped.index, df_grouped["saldo"], color="blue")
+else:
+    ax.plot(df_grouped.index, df_grouped["saldo"], color="green", linewidth=2)
+
+# Konversi batas Y sesuai pilihan
+limits = {
+    "1Jt (lonjakan 100rb)": (1_000_000, 100_000),
+    "10Jt (lonjakan 500rb)": (10_000_000, 500_000),
+    "100Jt (lonjakan 5jt)": (100_000_000, 5_000_000),
+    "1M (lonjakan 50jt)": (1_000_000_000, 50_000_000),
+    "10M (lonjakan 500jt)": (10_000_000_000, 500_000_000)
+}
+y_max, y_step = limits[y_max_option]
+ax.set_ylim(0, y_max)
+ax.set_yticks(range(0, y_max + y_step, y_step))
+
 ax.set_title(f"Saldo {periode}")
 ax.set_ylabel("Saldo (Rp)")
-ax.set_ylim(0, 10_000_000)
-ax.set_yticks(range(0, 10_500_000, 500_000))
 ax.grid(True, linestyle='--', alpha=0.3)
 st.pyplot(fig)
 
@@ -131,4 +146,3 @@ if "kategori" in df.columns and not df[df["pengeluaran"] > 0].empty:
 # --- Tabel Data ---
 with st.expander("📋 Lihat Data Lengkap"):
     st.dataframe(df.sort_index(ascending=False).reset_index())
-
