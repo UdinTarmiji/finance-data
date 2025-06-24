@@ -1,4 +1,4 @@
-# main.py (Final Version - Perbaikan Grafik dan Saldo)
+# main.py (Final Version - Edit & Delete + Fix Chart)
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -64,16 +64,14 @@ st.markdown("## ➕ Tambah Data Baru")
 with st.expander("Input Data Manual"):
     with st.form("input_data"):
         tanggal = st.date_input("📅 Tanggal", dt.date.today())
-        waktu = st.time_input("🕒 Waktu", dt.datetime.now().time())
         pemasukan = st.number_input("⬆️ Pemasukan (Rp)", min_value=0)
         pengeluaran = st.number_input("⬇️ Pengeluaran (Rp)", min_value=0)
         kategori = st.text_input("🏷️ Kategori", value="Umum")
         submit = st.form_submit_button("💾 Simpan")
 
         if submit:
-            waktu_komplit = dt.datetime.combine(tanggal, waktu)
             new_row = pd.DataFrame({
-                "tanggal": [waktu_komplit],
+                "tanggal": [pd.to_datetime(tanggal)],
                 "pemasukan": [pemasukan],
                 "pengeluaran": [pengeluaran],
                 "kategori": [kategori if pengeluaran > 0 else "-"]
@@ -83,12 +81,36 @@ with st.expander("Input Data Manual"):
             simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
             st.success("✅ Data berhasil ditambahkan!")
 
-# --- Proses Data ---
+# --- Edit/Delete Data ---
+st.markdown("## ✏️ Edit atau Hapus Transaksi")
+edit_idx = st.selectbox("Pilih Baris Data", df.index, format_func=lambda i: f"{df.loc[i, 'tanggal'].date()} - Rp {df.loc[i, 'pemasukan']} / Rp {df.loc[i, 'pengeluaran']}")
+with st.form("edit_data"):
+    new_tanggal = st.date_input("📅 Tanggal", df.loc[edit_idx, "tanggal"].date())
+    new_pemasukan = st.number_input("⬆️ Pemasukan", value=int(df.loc[edit_idx, "pemasukan"]))
+    new_pengeluaran = st.number_input("⬇️ Pengeluaran", value=int(df.loc[edit_idx, "pengeluaran"]))
+    new_kategori = st.text_input("🏷️ Kategori", value=df.loc[edit_idx, "kategori"])
+    col1, col2 = st.columns(2)
+    if col1.form_submit_button("💾 Simpan Perubahan"):
+        df.at[edit_idx, "tanggal"] = pd.to_datetime(new_tanggal)
+        df.at[edit_idx, "pemasukan"] = new_pemasukan
+        df.at[edit_idx, "pengeluaran"] = new_pengeluaran
+        df.at[edit_idx, "kategori"] = new_kategori
+        df.to_csv(user_csv_path, index=False)
+        simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
+        st.success("✅ Data berhasil diubah!")
+    if col2.form_submit_button("🗑️ Hapus"):
+        df.drop(index=edit_idx, inplace=True)
+        df.reset_index(drop=True, inplace=True)
+        df.to_csv(user_csv_path, index=False)
+        simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
+        st.success("🗑️ Data dihapus!")
+
+# --- Hitung Saldo ---
 df = df.dropna(subset=["tanggal"])
 df["tanggal"] = pd.to_datetime(df["tanggal"])
+df = df.sort_values("tanggal")
 df["pemasukan"] = pd.to_numeric(df["pemasukan"], errors="coerce").fillna(0)
 df["pengeluaran"] = pd.to_numeric(df["pengeluaran"], errors="coerce").fillna(0)
-df = df.sort_values("tanggal")
 df["saldo"] = df["pemasukan"].cumsum() - df["pengeluaran"].cumsum()
 
 # --- Ringkasan ---
@@ -107,7 +129,6 @@ chart_type = st.radio("Tipe Grafik", ["Line Chart", "Area Chart"])
 
 resample_map = {"Harian": "D", "Mingguan": "W", "Bulanan": "M", "Tahunan": "Y"}
 df_chart = df.set_index("tanggal").resample(resample_map[periode]).sum(numeric_only=True)
-df_chart = df_chart.fillna(0)
 df_chart["saldo"] = df_chart["pemasukan"].cumsum() - df_chart["pengeluaran"].cumsum()
 
 fig, ax = plt.subplots(figsize=(10, 4))
