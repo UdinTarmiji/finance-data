@@ -81,16 +81,19 @@ with st.expander("Input Data Manual"):
         submit = st.form_submit_button("📂 Simpan")
 
         if submit:
-            new_row = pd.DataFrame({
-                "tanggal": [str(tanggal)],
-                "pemasukan": [pemasukan],
-                "pengeluaran": [pengeluaran],
-                "kategori": [kategori if pengeluaran > 0 else "-"]
-            })
-            df = pd.concat([df, new_row], ignore_index=True)
-            df.to_csv(user_csv_path, index=False, encoding="utf-8-sig")
-            simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
-            st.success("✅ Data berhasil ditambahkan!")
+            try:
+                new_row = pd.DataFrame({
+                    "tanggal": [str(tanggal)],
+                    "pemasukan": [pemasukan],
+                    "pengeluaran": [pengeluaran],
+                    "kategori": [kategori if pengeluaran > 0 else "-"]
+                })
+                df = pd.concat([df, new_row], ignore_index=True)
+                df.to_csv(user_csv_path, index=False, encoding="utf-8-sig")
+                simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
+                st.success("✅ Data berhasil ditambahkan!")
+            except Exception as e:
+                st.error(f"Gagal menambahkan data: {e}")
 
 # --- Proses Data ---
 df = df.dropna(subset=["tanggal"])
