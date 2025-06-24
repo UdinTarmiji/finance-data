@@ -1,73 +1,65 @@
 import streamlit as st
 import pandas as pd
+import datetime
 import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression
 
-# --- Setup halaman ---
-st.set_page_config(page_title="Prediksi Keuangan", page_icon="💰")
+st.set_page_config(page_title="Keuangan Harian", page_icon="💰")
+st.title("📊 Aplikasi Catatan Keuangan")
 
-st.title("📈 Prediksi Pemasukan Berdasarkan Pengeluaran")
-st.write("Aplikasi ini memprediksi pemasukan harian berdasarkan pengeluaran menggunakan model Machine Learning sederhana.")
+# Session state untuk menyimpan data
+if "data" not in st.session_state:
+    st.session_state.data = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran"])
 
-# --- Load Dataset dari GitHub ---
-url = "https://raw.githubusercontent.com/UdinTarmiji/finance-data/main/data/finance_data.csv"
-data = pd.read_csv(url)
+# --- Form Input ---
+with st.form("input_form"):
+    st.subheader("➕ Tambah Catatan Keuangan")
 
-# --- Model Training ---
-x = data[["pengeluaran"]]
-y = data["pemasukan"]
-model = LinearRegression()
-model.fit(x, y)
+    today = datetime.date.today()
+    tanggal = st.date_input("Tanggal", today)
+    waktu = st.time_input("Waktu", datetime.datetime.now().time())
+    pemasukan = st.number_input("Pemasukan (Rp)", 0)
+    pengeluaran = st.number_input("Pengeluaran (Rp)", 0)
 
-# --- Input User ---
-st.header("🔢 Masukkan Pengeluaran Harian")
-user_pengeluaran = st.number_input("Masukkan nominal pengeluaran (Rp):", min_value=0, step=10000)
+    submitted = st.form_submit_button("Simpan")
 
-# --- History Prediksi ---
-if "history" not in st.session_state:
-    st.session_state.history = []
+    if submitted:
+        datetime_str = datetime.datetime.combine(tanggal, waktu)
+        new_row = {"tanggal": datetime_str, "pemasukan": pemasukan, "pengeluaran": pengeluaran}
+        st.session_state.data.loc[len(st.session_state.data)] = new_row
+        st.success("✅ Data berhasil disimpan!")
 
-if st.button("🎯 Prediksi"):
-    hasil = model.predict([[user_pengeluaran]])
-    prediksi = int(hasil[0])
-    st.success(f"💸 Prediksi pemasukan: Rp {prediksi:,}")
-    
-    # Simpan ke history
-    st.session_state.history.append({"pengeluaran": user_pengeluaran, "pemasukan": prediksi})
+# --- Upload CSV (optional) ---
+st.sidebar.subheader("📁 Upload Data dari CSV")
+uploaded_file = st.sidebar.file_uploader("Pilih file CSV", type=["csv"])
+if uploaded_file:
+    uploaded_data = pd.read_csv(uploaded_file)
+    st.session_state.data = pd.concat([st.session_state.data, uploaded_data], ignore_index=True)
+    st.success("📥 Data dari CSV berhasil dimuat!")
 
-    # Feedback
-    if prediksi > user_pengeluaran:
-        st.write("✅ Potensi untung, pemasukan lebih besar dari pengeluaran.")
-    else:
-        st.write("⚠️ Hati-hati! Bisa jadi defisit.")
+# --- Tampilkan Tabel ---
+st.subheader("📋 Riwayat Keuangan")
+st.dataframe(st.session_state.data.sort_values("tanggal", ascending=False))
 
-# --- Riwayat Prediksi ---
-if st.session_state.history:
-    st.subheader("📂 Riwayat Prediksi")
-    history_df = pd.DataFrame(st.session_state.history)
-    st.dataframe(history_df)
+# --- Visualisasi ---
+if not st.session_state.data.empty:
+    st.subheader("📈 Grafik Keuangan")
 
-    # Visualisasi History
-    st.subheader("📊 Grafik Riwayat Prediksi")
-    fig1, ax1 = plt.subplots()
-    ax1.plot(history_df["pengeluaran"], history_df["pemasukan"], marker='o', linestyle='-')
-    ax1.set_xlabel("Pengeluaran (Rp)")
-    ax1.set_ylabel("Pemasukan (Rp)")
-    ax1.set_title("Riwayat Prediksi Pengeluaran vs Pemasukan")
-    st.pyplot(fig1)
+    df = st.session_state.data.copy()
+    df["tanggal"] = pd.to_datetime(df["tanggal"])
+    df = df.sort_values("tanggal")
 
-# --- Visualisasi Dataset Asli ---
-st.subheader("📉 Visualisasi Dataset Asli")
-fig2, ax2 = plt.subplots()
-ax2.scatter(data["pengeluaran"], data["pemasukan"], color='blue', label="Data asli")
-ax2.plot(data["pengeluaran"], model.predict(data[["pengeluaran"]]), color='red', label="Model prediksi")
-ax2.set_xlabel("Pengeluaran")
-ax2.set_ylabel("Pemasukan")
-ax2.set_title("Data Asli & Garis Prediksi")
-ax2.grid(True)
-ax2.legend()
-st.pyplot(fig2)
+    fig, ax = plt.subplots()
+    ax.plot(df["tanggal"], df["pemasukan"], label="Pemasukan", marker="o", color="green")
+    ax.plot(df["tanggal"], df["pengeluaran"], label="Pengeluaran", marker="x", color="red")
+    ax.set_xlabel("Tanggal")
+    ax.set_ylabel("Jumlah (Rp)")
+    ax.set_title("Pemasukan vs Pengeluaran")
+    ax.legend()
+    ax.grid(True)
+    st.pyplot(fig)
+else:
+    st.info("Belum ada data untuk divisualisasikan.")
 
 # --- Footer ---
 st.markdown("---")
-st.caption("Dibuat oleh Dafiq • Powered by Machine Learning & Streamlit")
+st.caption("Dibuat oleh Dafiq 💻 | Powered by Streamlit")
