@@ -41,19 +41,12 @@ def simpan_ke_github(dataframe, filepath):
 # --- USERNAME LOGIN PAGE ---
 if "username" not in st.session_state:
     st.session_state.username = ""
-    st.session_state.logged_in = False
 
-if not st.session_state.logged_in:
-    mode = st.radio("Pilih Mode:", ["Login", "Register"])
-    username_input = st.text_input("Username")
-    password_input = st.text_input("Password", type="password")
-    if st.button("Login/Register"):
-        st.session_state.username = username_input
-        st.session_state.logged_in = True
-        st.rerun()
-    st.stop()
+if not st.session_state.username:
+    st.session_state.username = st.text_input("Masukkan Username untuk Memulai:")
+    if not st.session_state.username:
+        st.stop()
 
-# --- User Directory Setup ---
 user_folder = f"data/{st.session_state.username}"
 os.makedirs(user_folder, exist_ok=True)
 user_csv_path = os.path.join(user_folder, "data.csv")
@@ -90,42 +83,53 @@ if st.session_state.get("show_form"):
             st.success("✅ Data berhasil ditambahkan!")
             st.session_state.show_form = False
 
-# --- Load and Filter Data ---
-if st.session_state.manual_data.empty:
-    st.warning("📎 Silakan input data keuangan terlebih dahulu.")
+st.sidebar.header("📤 Upload CSV")
+uploaded_file = st.sidebar.file_uploader("Unggah file CSV Anda", type=["csv"])
+
+if uploaded_file:
+    df = pd.read_csv(uploaded_file, parse_dates=["tanggal"])
+elif not st.session_state.manual_data.empty:
+    df = st.session_state.manual_data.copy()
+else:
+    st.warning("📎 Silakan upload file CSV atau input data manual terlebih dahulu.")
     st.stop()
 
-df = st.session_state.manual_data.copy()
-df["tanggal"] = pd.to_datetime(df["tanggal"])
-df = df.sort_values("tanggal")
-df["saldo"] = df["pemasukan"].cumsum() - df["pengeluaran"].cumsum()
-
-# --- Filters ---
-st.sidebar.header("🔍 Filter")
+# --- Filter ---
+st.sidebar.subheader("🔍 Filter")
 start_date = st.sidebar.date_input("Mulai Tanggal", value=dt.date.today() - dt.timedelta(days=30))
 end_date = st.sidebar.date_input("Sampai Tanggal", value=dt.date.today())
 kategori_filter = st.sidebar.multiselect("Pilih Kategori", options=sorted(df["kategori"].unique()))
 
 if start_date and end_date:
     df = df[(df["tanggal"] >= pd.to_datetime(start_date)) & (df["tanggal"] <= pd.to_datetime(end_date))]
+
 if kategori_filter:
     df = df[df["kategori"].isin(kategori_filter)]
 
-# --- Summary Metrics ---
+# --- Pastikan data numerik ---
+df["pemasukan"] = pd.to_numeric(df["pemasukan"], errors="coerce").fillna(0)
+df["pengeluaran"] = pd.to_numeric(df["pengeluaran"], errors="coerce").fillna(0)
+
+# --- Perhitungan dan Visualisasi ---
+df["tanggal"] = pd.to_datetime(df["tanggal"])
+df = df.sort_values("tanggal")
+df["saldo"] = df["pemasukan"].cumsum() - df["pengeluaran"].cumsum()
+
 total_pemasukan = df["pemasukan"].sum()
 total_pengeluaran = df["pengeluaran"].sum()
 total_saldo = total_pemasukan - total_pengeluaran
 
+st.markdown("---")
 st.metric("💰 Total Saldo", f"Rp {total_saldo:,.0f}")
 st.metric("📥 Total Pemasukan", f"Rp {total_pemasukan:,.0f}")
 st.metric("📤 Total Pengeluaran", f"Rp {total_pengeluaran:,.0f}")
 
-# --- Grafik Saldo Akumulatif ---
-st.markdown("## 📊 Grafik Saldo Akumulatif")
+st.markdown("## 📅 Pilih Periode dan Tipe Grafik")
 periode = st.selectbox("Tampilkan berdasarkan:", ["Harian", "Mingguan", "Bulanan", "Tahunan"])
-tipe_grafik = st.radio("Jenis Visualisasi:", ["Gunung (Area Chart)", "Diagram (Line Chart)"])
-y_max_option = st.selectbox("Batas Maksimum Y:", ["1Jt (lonjakan 100rb)", "10Jt (lonjakan 500rb)", "100Jt (lonjakan 5jt)", "1M (lonjakan 50jt)", "10M (lonjakan 500jt)"])
+tipe_grafik = st.radio("Jenis Visualisasi Saldo:", ["Gunung (Area Chart)", "Diagram (Line Chart)"])
+y_max_option = st.selectbox("Batas Maksimum Y (Rp):", ["1Jt (lonjakan 100rb)", "10Jt (lonjakan 500rb)", "100Jt (lonjakan 5jt)", "1M (lonjakan 50jt)", "10M (lonjakan 500jt)"])
 
+# --- Resample ---
 df.set_index("tanggal", inplace=True)
 if periode == "Harian":
     df_grouped = df.resample("D").sum(numeric_only=True)
@@ -138,7 +142,10 @@ else:
 
 df_grouped["saldo"] = df_grouped["pemasukan"].cumsum() - df_grouped["pengeluaran"].cumsum()
 
+# --- Grafik Saldo ---
+st.subheader("📈 Grafik Saldo Akumulatif")
 fig, ax = plt.subplots(figsize=(10, 4))
+
 if tipe_grafik == "Gunung (Area Chart)":
     ax.fill_between(df_grouped.index, df_grouped["saldo"], color="skyblue", alpha=0.5)
     ax.plot(df_grouped.index, df_grouped["saldo"], color="blue")
@@ -160,9 +167,9 @@ ax.set_ylabel("Saldo (Rp)")
 ax.grid(True, linestyle='--', alpha=0.3)
 st.pyplot(fig)
 
-# --- Pie Chart ---
+# --- Pie Chart Kategori Pengeluaran ---
 if "kategori" in df.columns and not df[df["pengeluaran"] > 0].empty:
-    st.markdown("## 🥧 Distribusi Pengeluaran per Kategori")
+    st.subheader("📊 Distribusi Pengeluaran berdasarkan Kategori")
     kategori_data = df[df["pengeluaran"] > 0].groupby("kategori")["pengeluaran"].sum()
     warna = ["#%06x" % random.randint(0, 0xFFFFFF) for _ in range(len(kategori_data))]
     fig2, ax2 = plt.subplots()
@@ -174,12 +181,12 @@ if "kategori" in df.columns and not df[df["pengeluaran"] > 0].empty:
     for kategori, total in kategori_data.items():
         st.write(f"🔹 **{kategori}**: Rp {total:,.0f}")
 
-# --- Tabel Data ---
+# --- Export ---
+st.download_button("📤 Unduh CSV", data=df.reset_index().to_csv(index=False).encode(), file_name="keuangan.csv", mime="text/csv")
+
+# --- Dataframe ---
 with st.expander("📋 Lihat Data Lengkap"):
     st.dataframe(df.reset_index().sort_values("tanggal", ascending=False))
-
-# --- Unduh Data ---
-st.download_button("📤 Unduh CSV", data=df.reset_index().to_csv(index=False).encode(), file_name="keuangan.csv", mime="text/csv")
 
 # --- Footer ---
 st.markdown("""
