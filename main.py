@@ -1,4 +1,4 @@
-# main.py (Final Version - Edit & Delete + Fix Chart)
+# main.py (Final Version)
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -39,7 +39,7 @@ def simpan_ke_github(dataframe, filepath):
         st.error("❌ Gagal menyimpan ke GitHub")
         st.write(response.json())
 
-# --- USERNAME LOGIN ---
+# --- LOGIN ---
 st.sidebar.header("🔐 Login Pengguna")
 if "username" not in st.session_state:
     st.session_state.username = ""
@@ -54,12 +54,13 @@ user_folder = f"data/{st.session_state.username}"
 os.makedirs(user_folder, exist_ok=True)
 user_csv_path = os.path.join(user_folder, "data.csv")
 
+# --- Load Data ---
 if os.path.exists(user_csv_path):
     df = pd.read_csv(user_csv_path, parse_dates=["tanggal"])
 else:
     df = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
 
-# --- Input Data ---
+# --- Input Manual ---
 st.markdown("## ➕ Tambah Data Baru")
 with st.expander("Input Data Manual"):
     with st.form("input_data"):
@@ -71,7 +72,7 @@ with st.expander("Input Data Manual"):
 
         if submit:
             new_row = pd.DataFrame({
-                "tanggal": [pd.to_datetime(tanggal)],
+                "tanggal": [tanggal],
                 "pemasukan": [pemasukan],
                 "pengeluaran": [pengeluaran],
                 "kategori": [kategori if pengeluaran > 0 else "-"]
@@ -81,36 +82,12 @@ with st.expander("Input Data Manual"):
             simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
             st.success("✅ Data berhasil ditambahkan!")
 
-# --- Edit/Delete Data ---
-st.markdown("## ✏️ Edit atau Hapus Transaksi")
-edit_idx = st.selectbox("Pilih Baris Data", df.index, format_func=lambda i: f"{df.loc[i, 'tanggal'].date()} - Rp {df.loc[i, 'pemasukan']} / Rp {df.loc[i, 'pengeluaran']}")
-with st.form("edit_data"):
-    new_tanggal = st.date_input("📅 Tanggal", df.loc[edit_idx, "tanggal"].date())
-    new_pemasukan = st.number_input("⬆️ Pemasukan", value=int(df.loc[edit_idx, "pemasukan"]))
-    new_pengeluaran = st.number_input("⬇️ Pengeluaran", value=int(df.loc[edit_idx, "pengeluaran"]))
-    new_kategori = st.text_input("🏷️ Kategori", value=df.loc[edit_idx, "kategori"])
-    col1, col2 = st.columns(2)
-    if col1.form_submit_button("💾 Simpan Perubahan"):
-        df.at[edit_idx, "tanggal"] = pd.to_datetime(new_tanggal)
-        df.at[edit_idx, "pemasukan"] = new_pemasukan
-        df.at[edit_idx, "pengeluaran"] = new_pengeluaran
-        df.at[edit_idx, "kategori"] = new_kategori
-        df.to_csv(user_csv_path, index=False)
-        simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
-        st.success("✅ Data berhasil diubah!")
-    if col2.form_submit_button("🗑️ Hapus"):
-        df.drop(index=edit_idx, inplace=True)
-        df.reset_index(drop=True, inplace=True)
-        df.to_csv(user_csv_path, index=False)
-        simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
-        st.success("🗑️ Data dihapus!")
-
-# --- Hitung Saldo ---
+# --- Persiapan Data ---
 df = df.dropna(subset=["tanggal"])
-df["tanggal"] = pd.to_datetime(df["tanggal"])
-df = df.sort_values("tanggal")
+df["tanggal"] = pd.to_datetime(df["tanggal"]).dt.date
 df["pemasukan"] = pd.to_numeric(df["pemasukan"], errors="coerce").fillna(0)
 df["pengeluaran"] = pd.to_numeric(df["pengeluaran"], errors="coerce").fillna(0)
+df = df.sort_values("tanggal")
 df["saldo"] = df["pemasukan"].cumsum() - df["pengeluaran"].cumsum()
 
 # --- Ringkasan ---
@@ -122,13 +99,15 @@ st.metric("💰 Total Saldo", f"Rp {total_saldo:,.0f}")
 st.metric("📈 Total Pemasukan", f"Rp {total_pemasukan:,.0f}")
 st.metric("📉 Total Pengeluaran", f"Rp {total_pengeluaran:,.0f}")
 
-# --- Pilih Periode & Chart ---
+# --- Grafik Saldo ---
 st.markdown("## 📅 Grafik Saldo")
 periode = st.selectbox("Pilih Periode", ["Harian", "Mingguan", "Bulanan", "Tahunan"])
 chart_type = st.radio("Tipe Grafik", ["Line Chart", "Area Chart"])
 
 resample_map = {"Harian": "D", "Mingguan": "W", "Bulanan": "M", "Tahunan": "Y"}
-df_chart = df.set_index("tanggal").resample(resample_map[periode]).sum(numeric_only=True)
+df_chart = df.copy()
+df_chart["tanggal"] = pd.to_datetime(df_chart["tanggal"])
+df_chart = df_chart.set_index("tanggal").resample(resample_map[periode]).sum(numeric_only=True)
 df_chart["saldo"] = df_chart["pemasukan"].cumsum() - df_chart["pengeluaran"].cumsum()
 
 fig, ax = plt.subplots(figsize=(10, 4))
@@ -137,7 +116,6 @@ if chart_type == "Line Chart":
 else:
     ax.fill_between(df_chart.index, df_chart["saldo"], color="skyblue", alpha=0.5)
     ax.plot(df_chart.index, df_chart["saldo"], color="blue", linewidth=2)
-
 ax.set_ylabel("Saldo (Rp)")
 ax.set_title(f"Perkembangan Saldo - {periode}")
 ax.grid(True, linestyle="--", alpha=0.5)
@@ -156,9 +134,39 @@ if not df[df["pengeluaran"] > 0].empty:
     for kategori, nominal in kategori_data.items():
         st.write(f"🔹 {kategori}: Rp {nominal:,.0f}")
 
-# --- Tabel & Unduh ---
+# --- History & Edit ---
 with st.expander("📄 Lihat Data Lengkap"):
     st.dataframe(df.sort_values("tanggal", ascending=False))
+
+    if st.button("✏️ Edit / Hapus Transaksi"):
+        idx_list = list(df.index)
+        selected_index = st.selectbox("Pilih Index Transaksi", idx_list)
+
+        selected_row = df.loc[selected_index]
+        st.write("Transaksi Terpilih:", selected_row)
+
+        with st.form("edit_form"):
+            new_tanggal = st.date_input("Tanggal", pd.to_datetime(selected_row["tanggal"]))
+            new_pemasukan = st.number_input("Pemasukan", value=int(selected_row["pemasukan"]))
+            new_pengeluaran = st.number_input("Pengeluaran", value=int(selected_row["pengeluaran"]))
+            new_kategori = st.text_input("Kategori", value=selected_row["kategori"])
+            save = st.form_submit_button("💾 Simpan Perubahan")
+            delete = st.form_submit_button("🗑️ Hapus")
+
+            if save:
+                df.at[selected_index, "tanggal"] = new_tanggal
+                df.at[selected_index, "pemasukan"] = new_pemasukan
+                df.at[selected_index, "pengeluaran"] = new_pengeluaran
+                df.at[selected_index, "kategori"] = new_kategori
+                df.to_csv(user_csv_path, index=False)
+                simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
+                st.success("✅ Data berhasil diperbarui!")
+
+            if delete:
+                df = df.drop(index=selected_index).reset_index(drop=True)
+                df.to_csv(user_csv_path, index=False)
+                simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
+                st.success("🗑️ Data berhasil dihapus!")
 
 st.download_button("📥 Unduh CSV", df.to_csv(index=False).encode(), "keuangan.csv")
 
