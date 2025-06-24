@@ -12,17 +12,32 @@ st.sidebar.header("📤 Upload CSV")
 uploaded_file = st.sidebar.file_uploader("Unggah file CSV Anda", type=["csv"])
 
 # --- Input Manual ---
-st.sidebar.header("📝 Tambah Data Manual")
-with st.sidebar.form("manual_input"):
-    col1, col2 = st.columns(2)
-    with col1:
-        tanggal_input = st.date_input("Tanggal", dt.date.today())
-    with col2:
-        waktu_input = st.time_input("Waktu", dt.datetime.now().time())
-    pemasukan_input = st.number_input("Pemasukan (Rp)", min_value=0, step=50000)
-    pengeluaran_input = st.number_input("Pengeluaran (Rp)", min_value=0, step=50000)
-    kategori_input = st.text_input("Kategori Pengeluaran (jika ada)", value="Umum")
-    submitted = st.form_submit_button("Tambah ke Data")
+# --- Tombol dan Modal untuk Input Manual ---
+if st.button("➕ Input Data Manual"):
+    with st.modal("Input Data Keuangan Manual", key="modal_input"):
+        st.write("Silakan lengkapi data berikut:")
+
+        with st.form("form_input_modal"):
+            col1, col2 = st.columns(2)
+            with col1:
+                tanggal_input = st.date_input("Tanggal", dt.date.today(), key="modal_date")
+            with col2:
+                waktu_input = st.time_input("Waktu", dt.datetime.now().time(), key="modal_time")
+
+            pemasukan_input = st.number_input("Pemasukan (Rp)", min_value=0, step=50000, key="modal_income")
+            pengeluaran_input = st.number_input("Pengeluaran (Rp)", min_value=0, step=50000, key="modal_expense")
+            kategori_input = st.text_input("Kategori Pengeluaran", value="Umum", key="modal_category")
+            submitted = st.form_submit_button("✅ Tambah")
+
+            if submitted:
+                new_data = pd.DataFrame({
+                    "tanggal": [dt.datetime.combine(tanggal_input, waktu_input)],
+                    "pemasukan": [pemasukan_input],
+                    "pengeluaran": [pengeluaran_input],
+                    "kategori": [kategori_input if pengeluaran_input > 0 else "-"]
+                })
+                st.session_state.manual_data = pd.concat([st.session_state.manual_data, new_data], ignore_index=True)
+                st.success("Data berhasil ditambahkan!")
 
 # Simpan data manual ke state
 if "manual_data" not in st.session_state:
