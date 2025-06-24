@@ -124,10 +124,10 @@ df_chart["saldo"] = df_chart["pemasukan"].cumsum() - df_chart["pengeluaran"].cum
 
 fig, ax = plt.subplots(figsize=(12, 5))
 if chart_type == "Line Chart":
-    ax.plot(df_chart.index, df_chart["saldo"], linewidth=5, color="blue")
+    ax.plot(df_chart.index, df_chart["saldo"], linewidth=3, color="blue")
 else:
     ax.fill_between(df_chart.index, df_chart["saldo"], color="skyblue", alpha=0.5)
-    ax.plot(df_chart.index, df_chart["saldo"], linewidth=5, color="blue")
+    ax.plot(df_chart.index, df_chart["saldo"], linewidth=3, color="blue")
 
 ax.set_ylabel("Saldo (Rp)")
 ax.set_title(f"Perkembangan Saldo - {periode}")
