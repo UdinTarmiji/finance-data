@@ -108,10 +108,10 @@ if not df.empty:
 
     fig, ax = plt.subplots(figsize=(10, 4))
     if chart_type == "Line Chart":
-        ax.plot(df_chart.index, df_chart["saldo"], color="red", linewidth=2)
+        ax.plot(df_chart.index, df_chart["saldo"], color="red", linewidth=4)
     else:
         ax.fill_between(df_chart.index, df_chart["saldo"], color="skyblue", alpha=0.5)
-        ax.plot(df_chart.index, df_chart["saldo"], color="blue", linewidth=2)
+        ax.plot(df_chart.index, df_chart["saldo"], color="blue", linewidth=4)
 
     ax.set_ylabel("Saldo (Rp)")
     ax.set_ylim(bottom=0)
