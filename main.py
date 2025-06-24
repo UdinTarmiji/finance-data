@@ -3,9 +3,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # --- Setup Page ---
-st.set_page_config(page_title="AI Analis Keuangan", page_icon="📊")
-st.title("📊 AI Analis Keuangan")
-st.write("Analisis pemasukan dan pengeluaran perusahaan dengan bantuan AI sederhana.")
+st.set_page_config(page_title="Analis Keuangan", page_icon="📊")
+st.title("📊Analis Keuangan")
+st.write("Analisis pemasukan dan pengeluaran perusahaan dengan bantuan program sederhana.")
 
 # --- Load Dataset ---
 url = "https://raw.githubusercontent.com/UdinTarmiji/income-data/main/data/finance_data.csv"
@@ -40,7 +40,7 @@ plt.xticks(rotation=45)
 st.pyplot(fig)
 
 # --- Analisis AI Sederhana ---
-st.header("💬 Analisis AI")
+st.header("💬 Analisis")
 if total_profit > 5_000_000:
     st.success("Performa keuangan sangat baik! 🚀")
 elif total_profit > 0:
@@ -54,4 +54,4 @@ with st.expander("🔍 Lihat Tabel Data"):
 
 # --- Footer ---
 st.markdown("---")
-st.caption("Made with 💙 by Dafiq")
+st.caption("Made by Dafiq")
