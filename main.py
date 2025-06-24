@@ -1,87 +1,61 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime
+import datetime as dt
 
+# --- Setup ---
 st.set_page_config(page_title="📊 Finance Tracker", page_icon="💰")
-st.title("💰 Aplikasi Pencatatan Keuangan & Visualisasi")
+st.title("💰 Finance Visualizer & Analyzer")
 
 # --- Upload CSV ---
-st.subheader("📤 Upload File CSV Anda")
-uploaded = st.file_uploader("Pilih file CSV", type=["csv"])
+st.write("Upload CSV dengan kolom: `tanggal`, `pemasukan`, `pengeluaran`")
+uploaded_file = st.file_uploader("Upload file", type=["csv"])
 
-# --- Load Data ---
-if uploaded:
-    df = pd.read_csv(uploaded)
-    df["tanggal"] = pd.to_datetime(df["tanggal"])
-    st.session_state.data = df
-else:
-    if "data" not in st.session_state:
-        st.session_state.data = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran"])
+if uploaded_file:
+    data = pd.read_csv(uploaded_file)
+    data['tanggal'] = pd.to_datetime(data['tanggal'])
+    data = data.sort_values(by='tanggal')
+    data['saldo'] = data['pemasukan'] - data['pengeluaran']
+    data['total_saldo'] = data['saldo'].cumsum()
 
-# --- Input Manual ---
-st.subheader("📝 Tambahkan Catatan Baru")
-with st.form("entry_form"):
-    col1, col2 = st.columns(2)
-    with col1:
-        tgl = st.date_input("Tanggal", value=datetime.today())
-        pemasukan = st.number_input("Pemasukan", 0, step=50000)
-    with col2:
-        waktu = st.time_input("Waktu", value=datetime.now().time())
-        pengeluaran = st.number_input("Pengeluaran", 0, step=50000)
-    submitted = st.form_submit_button("Tambah")
-    if submitted:
-        full_datetime = datetime.combine(tgl, waktu)
-        new_row = {"tanggal": full_datetime, "pemasukan": pemasukan, "pengeluaran": pengeluaran}
-        st.session_state.data = pd.concat([st.session_state.data, pd.DataFrame([new_row])], ignore_index=True)
-        st.success("Data berhasil ditambahkan!")
+    # --- Filter by timeframe ---
+    st.subheader("📅 Pilih Rentang Waktu")
+    time_option = st.selectbox("Lihat berdasarkan:", ["Harian (7 Hari)", "Mingguan (1 Bulan)", "Bulanan (1 Tahun)", "Tahunan"])
 
-# --- Tabel Data ---
-if not st.session_state.data.empty:
-    st.subheader("📄 Data Saat Ini")
-    st.dataframe(st.session_state.data.sort_values("tanggal"))
-
-# --- Pilihan Agregasi ---
-st.subheader("🕒 Pilih Rentang Waktu Visualisasi")
-rentang = st.selectbox("Tampilkan grafik berdasarkan:", ("Jam", "Hari", "Minggu", "Bulan", "Tahun"))
-
-# --- Visualisasi ---
-if not st.session_state.data.empty:
-    df = st.session_state.data.copy()
-    df["tanggal"] = pd.to_datetime(df["tanggal"])
-
-    if rentang == "Jam":
-        df["waktu"] = df["tanggal"].dt.hour
-        group = df.groupby("waktu")[["pemasukan", "pengeluaran"]].sum()
-        xlabel = "Jam (0-23)"
-    elif rentang == "Hari":
-        df["waktu"] = df["tanggal"].dt.day_name()
-        order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-        group = df.groupby("waktu")[["pemasukan", "pengeluaran"]].sum().reindex(order)
-        xlabel = "Hari"
-    elif rentang == "Minggu":
-        df["waktu"] = df["tanggal"].dt.isocalendar().week
-        group = df.groupby("waktu")[["pemasukan", "pengeluaran"]].sum()
-        xlabel = "Minggu ke-"
-    elif rentang == "Bulan":
-        df["waktu"] = df["tanggal"].dt.strftime("%B")
-        order = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-        group = df.groupby("waktu")[["pemasukan", "pengeluaran"]].sum().reindex(order)
-        xlabel = "Bulan"
+    if time_option == "Harian (7 Hari)":
+        recent = data[data['tanggal'] > (data['tanggal'].max() - pd.Timedelta(days=7))]
+        group_data = recent.groupby(data['tanggal'].dt.date).sum()
+        x_label = "Tanggal"
+    elif time_option == "Mingguan (1 Bulan)":
+        data['minggu'] = data['tanggal'].dt.isocalendar().week
+        data['tahun'] = data['tanggal'].dt.year
+        group_data = data.groupby(['tahun', 'minggu']).sum(numeric_only=True)
+        group_data.index = [f"{y}-W{k}" for y, k in group_data.index]
+        x_label = "Minggu"
+    elif time_option == "Bulanan (1 Tahun)":
+        data['bulan'] = data['tanggal'].dt.month
+        data['tahun'] = data['tanggal'].dt.year
+        group_data = data.groupby(['tahun', 'bulan']).sum(numeric_only=True)
+        group_data.index = [f"{y}-{m:02d}" for y, m in group_data.index]
+        x_label = "Bulan"
     else:
-        df["waktu"] = df["tanggal"].dt.year
-        group = df.groupby("waktu")[["pemasukan", "pengeluaran"]].sum()
-        xlabel = "Tahun"
+        data['tahun'] = data['tanggal'].dt.year
+        group_data = data.groupby('tahun').sum(numeric_only=True)
+        x_label = "Tahun"
 
-    # Plot
-    st.subheader(f"📈 Grafik Keuangan per {rentang}")
-    fig, ax = plt.subplots()
-    group.plot(kind="bar", ax=ax)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel("Jumlah (Rp)")
-    ax.set_title(f"Pemasukan dan Pengeluaran per {rentang}")
+    # --- Plotting ---
+    st.subheader("📈 Grafik Saldo")
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.fill_between(group_data.index, group_data['pemasukan'] - group_data['pengeluaran'], color='#4caf50', alpha=0.6)
+    ax.set_ylabel("Saldo (Rp)")
+    ax.set_xlabel(x_label)
+    ax.set_ylim(0, 10_000_000)
+    ax.set_yticks(range(0, 10_000_001, 500_000))
+    ax.set_title("Visualisasi Keuangan: Sisa Pendapatan")
+    ax.grid(True, axis='y', linestyle='--', alpha=0.3)
+    plt.xticks(rotation=45)
     st.pyplot(fig)
 
-# --- Footer ---
-st.markdown("---")
-st.caption("Made with 💙 by Dafiq")
+    # --- Show Table ---
+    st.subheader("🧾 Tabel Ringkasan")
+    st.dataframe(group_data[['pemasukan', 'pengeluaran']])
