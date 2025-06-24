@@ -15,32 +15,29 @@ uploaded_file = st.sidebar.file_uploader("Unggah file CSV Anda", type=["csv"])
 if "manual_data" not in st.session_state:
     st.session_state.manual_data = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
 
-# --- Tombol dan Modal untuk Input Manual ---
+# --- Tombol dan Form Input Manual ---
 if st.button("➕ Input Data Manual"):
-    with st.modal("Input Data Keuangan Manual", key="modal_input"):
+    with st.popover("Input Data Keuangan Manual"):
         st.write("Silakan lengkapi data berikut:")
-
-        with st.form("form_input_modal"):
-            col1, col2 = st.columns(2)
-            with col1:
-                tanggal_input = st.date_input("Tanggal", dt.date.today(), key="modal_date")
-            with col2:
-                waktu_input = st.time_input("Waktu", dt.datetime.now().time(), key="modal_time")
-
-            pemasukan_input = st.number_input("Pemasukan (Rp)", min_value=0, step=50000, key="modal_income")
-            pengeluaran_input = st.number_input("Pengeluaran (Rp)", min_value=0, step=50000, key="modal_expense")
-            kategori_input = st.text_input("Kategori Pengeluaran", value="Umum", key="modal_category")
-            submitted = st.form_submit_button("✅ Tambah")
-
-            if submitted:
-                new_data = pd.DataFrame({
-                    "tanggal": [dt.datetime.combine(tanggal_input, waktu_input)],
-                    "pemasukan": [pemasukan_input],
-                    "pengeluaran": [pengeluaran_input],
-                    "kategori": [kategori_input if pengeluaran_input > 0 else "-"]
-                })
-                st.session_state.manual_data = pd.concat([st.session_state.manual_data, new_data], ignore_index=True)
-                st.success("Data berhasil ditambahkan!")
+        with st.form("form_input"):            
+            tanggal = st.date_input("Tanggal", dt.date.today())
+            waktu = st.time_input("Waktu", dt.datetime.now().time())
+            pemasukan = st.number_input("Pemasukan (Rp)", min_value=0, step=50000)
+            pengeluaran = st.number_input("Pengeluaran (Rp)", min_value=0, step=50000)
+            kategori = st.text_input("Kategori Pengeluaran", value="Umum")
+            submit = st.form_submit_button("✅ Tambahkan")
+            if submit:
+                waktu_komplit = dt.datetime.combine(tanggal, waktu)
+                st.session_state.manual_data = pd.concat([
+                    st.session_state.manual_data,
+                    pd.DataFrame({
+                        "tanggal": [waktu_komplit],
+                        "pemasukan": [pemasukan],
+                        "pengeluaran": [pengeluaran],
+                        "kategori": [kategori if pengeluaran > 0 else "-"]
+                    })
+                ], ignore_index=True)
+                st.success("✅ Data berhasil ditambahkan!")
 
 # --- Load Data ---
 if uploaded_file:
@@ -48,7 +45,7 @@ if uploaded_file:
 elif not st.session_state.manual_data.empty:
     df = st.session_state.manual_data.copy()
 else:
-    st.warning("📎 Silakan upload file CSV atau input data manual.")
+    st.warning("📎 Silakan upload file CSV atau input data manual terlebih dahulu.")
     st.stop()
 
 # --- Preprocessing ---
