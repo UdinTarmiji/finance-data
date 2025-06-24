@@ -82,6 +82,7 @@ if st.session_state.get("show_form"):
             simpan_ke_github(st.session_state.manual_data, f"data/{st.session_state.username}/data.csv")
             st.success("✅ Data berhasil ditambahkan!")
             st.session_state.show_form = False
+            st.experimental_rerun()
 
 st.sidebar.header("📤 Upload CSV")
 uploaded_file = st.sidebar.file_uploader("Unggah file CSV Anda", type=["csv"])
@@ -115,6 +116,7 @@ df["tanggal"] = pd.to_datetime(df["tanggal"])
 df = df.sort_values("tanggal")
 df["saldo"] = df["pemasukan"].cumsum() - df["pengeluaran"].cumsum()
 
+# --- Total ---
 total_pemasukan = df["pemasukan"].sum()
 total_pengeluaran = df["pengeluaran"].sum()
 total_saldo = total_pemasukan - total_pengeluaran
