@@ -1,4 +1,4 @@
-# main.py (Versi Stabil & Final - Diperbarui dan Kompatibel Excel)
+# main.py (Versi Lengkap - Stabil, Aman, dan Fitur Tambahan)
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,8 +8,9 @@ import os
 import base64
 import json
 import requests
+from io import BytesIO
 
-st.set_page_config(page_title="Finance Tracker", page_icon="💰")
+st.set_page_config(page_title="Finance Tracker", page_icon="💰", layout="wide")
 st.title("💰 Finance Tracker")
 
 # --- GitHub Save Function ---
@@ -45,9 +46,16 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 
 username = st.sidebar.text_input("Masukkan Username")
-if username:
-    st.session_state.username = username
-else:
+password = st.sidebar.text_input("Password", type="password")
+login = st.sidebar.button("Login")
+
+if login:
+    if username and password:  # Simple validation only
+        st.session_state.username = username
+    else:
+        st.sidebar.error("Username dan Password wajib diisi")
+
+if not st.session_state.username:
     st.stop()
 
 user_folder = f"data/{st.session_state.username}"
@@ -90,22 +98,28 @@ df["pemasukan"] = pd.to_numeric(df["pemasukan"], errors="coerce").fillna(0)
 df["pengeluaran"] = pd.to_numeric(df["pengeluaran"], errors="coerce").fillna(0)
 df["saldo"] = df["pemasukan"].cumsum() - df["pengeluaran"].cumsum()
 
+# --- Filter Data ---
+st.sidebar.header("📆 Filter Data")
+tgl_awal = st.sidebar.date_input("Tanggal Awal", df["tanggal"].min().date() if not df.empty else dt.date.today())
+tgl_akhir = st.sidebar.date_input("Tanggal Akhir", df["tanggal"].max().date() if not df.empty else dt.date.today())
+df_filtered = df[(df["tanggal"] >= pd.to_datetime(tgl_awal)) & (df["tanggal"] <= pd.to_datetime(tgl_akhir))]
+
 # --- Ringkasan ---
 st.markdown("## 📊 Ringkasan")
-if not df.empty:
-    st.metric("💰 Total Saldo", f"Rp {df['saldo'].iloc[-1]:,.0f}")
-    st.metric("📈 Total Pemasukan", f"Rp {df['pemasukan'].sum():,.0f}")
-    st.metric("📉 Total Pengeluaran", f"Rp {df['pengeluaran'].sum():,.0f}")
+if not df_filtered.empty:
+    st.metric("💰 Total Saldo", f"Rp {df_filtered['saldo'].iloc[-1]:,.0f}")
+    st.metric("📈 Total Pemasukan", f"Rp {df_filtered['pemasukan'].sum():,.0f}")
+    st.metric("📉 Total Pengeluaran", f"Rp {df_filtered['pengeluaran'].sum():,.0f}")
 else:
-    st.warning("Belum ada data.")
+    st.warning("Tidak ada data pada rentang tanggal tersebut.")
 
 # --- Grafik Saldo ---
 st.markdown("## 🗓️ Grafik Saldo")
 periode = st.selectbox("Pilih Periode", ["Harian", "Mingguan", "Bulanan", "Tahunan"])
-chart_type = st.radio("Tipe Grafik", ["Line Chart", "Area Chart"])
+chart_type = st.radio("Tipe Grafik", ["Line Chart", "Area Chart"], horizontal=True)
 
 resample_map = {"Harian": "D", "Mingguan": "W", "Bulanan": "M", "Tahunan": "Y"}
-df_chart = df.set_index("tanggal").resample(resample_map[periode]).sum(numeric_only=True)
+df_chart = df_filtered.set_index("tanggal").resample(resample_map[periode]).sum(numeric_only=True)
 df_chart["saldo"] = df_chart["pemasukan"].cumsum() - df_chart["pengeluaran"].cumsum()
 
 fig, ax = plt.subplots(figsize=(12, 5))
@@ -122,7 +136,7 @@ st.pyplot(fig)
 
 # --- Pie Chart Pengeluaran ---
 st.markdown("## 🡝 Persentase Pengeluaran per Kategori")
-df_expense = df[df["pengeluaran"] > 0]
+df_expense = df_filtered[df_filtered["pengeluaran"] > 0]
 if not df_expense.empty:
     kategori_data = df_expense.groupby("kategori")["pengeluaran"].sum()
     warna = ["#%06x" % random.randint(0, 0xFFFFFF) for _ in kategori_data]
@@ -139,11 +153,11 @@ if not df_expense.empty:
 
 # --- History & Edit ---
 with st.expander("📄 Lihat Riwayat Transaksi"):
-    st.dataframe(df.sort_values("tanggal", ascending=False))
+    st.dataframe(df_filtered.sort_values("tanggal", ascending=False))
     if st.button("✏️ Edit / Hapus Transaksi"):
-        idx_list = list(df.index)
+        idx_list = list(df_filtered.index)
         selected_index = st.selectbox("Pilih Index", idx_list)
-        selected_row = df.loc[selected_index]
+        selected_row = df_filtered.loc[selected_index]
 
         with st.form("edit_form"):
             new_tanggal = st.date_input("Tanggal", selected_row["tanggal"].date())
@@ -167,6 +181,13 @@ with st.expander("📄 Lihat Riwayat Transaksi"):
                 df.to_csv(user_csv_path, index=False, encoding="utf-8-sig")
                 simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
                 st.success("🗑️ Data berhasil dihapus!")
+
+# --- Export ke Excel ---
+st.markdown("## 📥 Unduh Data")
+if st.button("⬇️ Unduh sebagai Excel"):
+    output = BytesIO()
+    df.to_excel(output, index=False, engine="xlsxwriter")
+    st.download_button("📥 Klik untuk Unduh", data=output.getvalue(), file_name="finance_data.xlsx")
 
 # --- Footer ---
 st.markdown("""
