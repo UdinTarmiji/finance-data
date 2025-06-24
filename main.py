@@ -1,4 +1,4 @@
-# main.py (Final Version - Fully Functional)
+# main.py (Final Version - Fixed Saldo and Chart)
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -84,6 +84,7 @@ with st.expander("Input Data Manual"):
             st.success("✅ Data berhasil ditambahkan!")
 
 # --- Hitung Saldo ---
+df = df.dropna(subset=["tanggal"])
 df["tanggal"] = pd.to_datetime(df["tanggal"])
 df["pemasukan"] = pd.to_numeric(df["pemasukan"], errors="coerce").fillna(0)
 df["pengeluaran"] = pd.to_numeric(df["pengeluaran"], errors="coerce").fillna(0)
