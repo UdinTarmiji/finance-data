@@ -6,7 +6,7 @@ import random
 import os
 
 st.set_page_config(page_title="📊 Finance Tracker", page_icon="💰")
-st.title("💰 Aplikasi Analisis Keuangan Harian")
+st.title("📊 Finance Tracker")
 
 # --- USERNAME LOGIN PAGE ---
 if "username" not in st.session_state:
@@ -112,6 +112,7 @@ if tipe_grafik == "Gunung (Area Chart)":
 else:
     ax.plot(df_grouped.index, df_grouped["saldo"], color="green", linewidth=2)
 
+# Konversi batas Y sesuai pilihan
 limits = {
     "1Jt (lonjakan 100rb)": (1_000_000, 100_000),
     "10Jt (lonjakan 500rb)": (10_000_000, 500_000),
@@ -145,3 +146,8 @@ if "kategori" in df.columns and not df[df["pengeluaran"] > 0].empty:
 # --- Tabel Data ---
 with st.expander("📋 Lihat Data Lengkap"):
     st.dataframe(df.sort_index(ascending=False).reset_index())
+
+# --- Footer ---
+st.markdown("---")
+st.markdown("Made by Dafiq | Powered by Machine Learning")
+st.markdown("[📞 WhatsApp](https://wa.me/6281224280846) | [📸 Instagram](https://instagram.com/dafiqelhaq) | [📧 Email](mailto:dafiqelhaq11@gmail.com)")
