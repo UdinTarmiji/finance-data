@@ -1,4 +1,4 @@
-# main.py (Versi Terbaru dan Stabil)
+# main.py (Versi Stabil & Final)
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -39,7 +39,7 @@ def simpan_ke_github(dataframe, filepath):
         st.error("❌ Gagal menyimpan ke GitHub")
         st.write(response.json())
 
-# --- Login Pengguna ---
+# --- USER LOGIN ---
 st.sidebar.header("🔐 Login Pengguna")
 if "username" not in st.session_state:
     st.session_state.username = ""
@@ -54,13 +54,12 @@ user_folder = f"data/{st.session_state.username}"
 os.makedirs(user_folder, exist_ok=True)
 user_csv_path = os.path.join(user_folder, "data.csv")
 
-# --- Load Data ---
 if os.path.exists(user_csv_path):
-    df = pd.read_csv(user_csv_path)
+    df = pd.read_csv(user_csv_path, parse_dates=["tanggal"])
 else:
     df = pd.DataFrame(columns=["tanggal", "pemasukan", "pengeluaran", "kategori"])
 
-# --- Input Manual ---
+# --- Input Data ---
 st.markdown("## ➕ Tambah Data Baru")
 with st.expander("Input Data Manual"):
     with st.form("input_data"):
@@ -82,9 +81,9 @@ with st.expander("Input Data Manual"):
             simpan_ke_github(df, f"data/{st.session_state.username}/data.csv")
             st.success("✅ Data berhasil ditambahkan!")
 
-# --- Bersihkan & Olah Data ---
-df["tanggal"] = pd.to_datetime(df["tanggal"], errors="coerce")
+# --- Proses Data ---
 df = df.dropna(subset=["tanggal"])
+df["tanggal"] = pd.to_datetime(df["tanggal"])
 df = df.sort_values("tanggal")
 df["pemasukan"] = pd.to_numeric(df["pemasukan"], errors="coerce").fillna(0)
 df["pengeluaran"] = pd.to_numeric(df["pengeluaran"], errors="coerce").fillna(0)
@@ -110,14 +109,14 @@ if chart_type == "Line Chart":
     ax.plot(df_chart.index, df_chart["saldo"], linewidth=3, color="blue")
 else:
     ax.fill_between(df_chart.index, df_chart["saldo"], color="skyblue", alpha=0.5)
-    ax.plot(df_chart.index, df_chart["saldo"], linewidth=2.5, color="blue")
+    ax.plot(df_chart.index, df_chart["saldo"], linewidth=3, color="blue")
 
 ax.set_ylabel("Saldo (Rp)")
 ax.set_title(f"Perkembangan Saldo - {periode}")
 ax.grid(True, linestyle="--", alpha=0.5)
 st.pyplot(fig)
 
-# --- Pie Chart ---
+# --- Pie Chart Pengeluaran ---
 st.markdown("## 🧁 Persentase Pengeluaran per Kategori")
 df_expense = df[df["pengeluaran"] > 0]
 if not df_expense.empty:
@@ -130,11 +129,13 @@ if not df_expense.empty:
         autotext.set_color("white")
     ax2.axis("equal")
     st.pyplot(fig2)
+    st.markdown("### 💡 Detail Kategori")
+    for kategori, nominal in kategori_data.items():
+        st.write(f"🔹 {kategori}: Rp {nominal:,.0f}")
 
-# --- History Transaksi ---
+# --- History & Edit ---
 with st.expander("📄 Lihat Riwayat Transaksi"):
     st.dataframe(df.sort_values("tanggal", ascending=False))
-
     if st.button("✏️ Edit / Hapus Transaksi"):
         idx_list = list(df.index)
         selected_index = st.selectbox("Pilih Index", idx_list)
