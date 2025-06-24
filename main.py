@@ -8,7 +8,7 @@ st.title("📊Analis Keuangan")
 st.write("Analisis pemasukan dan pengeluaran perusahaan dengan bantuan program sederhana.")
 
 # --- Load Dataset ---
-url = "https://raw.githubusercontent.com/UdinTarmiji/income-data/main/data/finance_data.csv"
+url = "https://raw.githubusercontent.com/UdinTarmiji/finance-data/main/data/finance-data.csv"
 data = pd.read_csv(url)
 
 # --- Proses Data ---
