@@ -10,6 +10,7 @@ st.write("Analisis pemasukan dan pengeluaran perusahaan dengan bantuan program s
 # --- Load Dataset ---
 url = "https://raw.githubusercontent.com/UdinTarmiji/finance-data/main/data/finance_data.csv"
 data = pd.read_csv(url)
+st.write("✅ CSV berhasil dimuat:", data.head())
 
 # --- Proses Data ---
 data["profit"] = data["pemasukan"] - data["pengeluaran"]
